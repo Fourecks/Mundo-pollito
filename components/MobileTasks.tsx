@@ -1,8 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Todo, Project, Priority, Subtask, RecurrenceRule, CalendarProvider } from '../types';
+import { Todo, Project, Subtask } from '../types';
 import MobileTaskDrawer from './MobileTaskDrawer';
-import { NotionService } from '../services/notionService';
 import { formatTime12h, formatDateRangeSafe } from '../src/utils/dateFormatter';
 import { 
     CheckCircle2, 
@@ -14,19 +12,9 @@ import {
     ChevronRight, 
     Calendar as CalendarIcon, 
     Clock, 
-    Folder, 
-    ArrowLeft, 
-    Trash2, 
     Check, 
-    Mic, 
-    MicOff, 
-    CalendarRange, 
-    ListTodo, 
-    FileText, 
-    RefreshCw,
-    Bell,
-    X,
-    ExternalLink, ChevronDown
+    ChevronDown,
+    ListTodo
 } from 'lucide-react';
 import { format, addDays, subDays, isSameDay } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -39,27 +27,13 @@ interface MobileTasksProps {
     onEditTodo?: (todo: Todo) => void;
     projects: Project[];
     onAddTask?: () => void;
-    onAddTodo?: (text: string, options?: { 
-        projectId?: number | null; 
-        isUndated?: boolean; 
-        dueDate?: string | null;
-        endDate?: string;
-        priority?: Priority;
-        startTime?: string;
-        endTime?: string;
-        notes?: string;
-        subtasks?: Subtask[];
-        recurrence?: RecurrenceRule;
-        reminder_offset?: Todo['reminder_offset'];
-        reminder_at?: string;
-    }) => Promise<void> | void;
+    onAddTodo?: (text: string, options?: any) => Promise<void> | void;
     onUpdateTodo?: (todo: Todo) => void;
     onDeleteTodo?: (id: number) => void;
     onRemoveFromCalendar?: (todoId: number) => Promise<void> | void;
-    onSyncToCalendar?: (todo: Todo, provider?: CalendarProvider) => Promise<void> | void;
+    onSyncToCalendar?: (todo: Todo, provider?: any) => Promise<void> | void;
     taskToEdit?: Todo | null;
     setTaskToEdit?: (todo: Todo | null) => void;
-    userName?: string;
 }
 
 const formatDateKey = (date: Date): string => {
@@ -93,32 +67,39 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
     projects = [],
     onAddTodo,
     onUpdateTodo,
-    onDeleteTodo,
     taskToEdit: externalTaskToEdit,
-    setTaskToEdit: externalSetTaskToEdit,
-    userName = 'Axel'
+    setTaskToEdit: externalSetTaskToEdit
 }) => {
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-    const [expandedTasks, setExpandedTasks] = useState<number[]>([]);
-    const toggleExpandTask = (id: number, e: React.MouseEvent) => { e.stopPropagation(); setExpandedTasks(prev => prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]); };
-    const [showAdvancedCreate, setShowAdvancedCreate] = useState(false);
-    const [showAdvancedEdit, setShowAdvancedEdit] = useState(false);
-
-    // Subpage navigation: 'list' | 'create' | 'edit'
-    const [subPage, setSubPage] = useState<'list' | 'create' | 'edit'>('list');
     const [tabView, setTabView] = useState<'dated' | 'undated'>('dated');
     const [activeEditingTask, setActiveEditingTask] = useState<Todo | null>(null);
+    const [expandedTasks, setExpandedTasks] = useState<number[]>([]);
+
+    const toggleExpandTask = (id: number, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setExpandedTasks(prev => prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]);
+    };
 
     // Sync external task to edit if triggered from outside
     useEffect(() => {
         if (externalTaskToEdit) {
-            handleOpenEditPage(externalTaskToEdit);
+            setActiveEditingTask(externalTaskToEdit);
+            setIsDrawerOpen(true);
         }
     }, [externalTaskToEdit]);
 
-    // Handle back navigation
-    const handleBackToList = () => {
-        setSubPage('list');
+    const handleOpenCreateDrawer = () => {
+        setActiveEditingTask(null);
+        setIsDrawerOpen(true);
+    };
+
+    const handleOpenEditDrawer = (task: Todo) => {
+        setActiveEditingTask(task);
+        setIsDrawerOpen(true);
+    };
+
+    const handleCloseDrawer = () => {
+        setIsDrawerOpen(false);
         setActiveEditingTask(null);
         if (externalSetTaskToEdit) {
             externalSetTaskToEdit(null);
@@ -167,1312 +148,33 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
     const undatedCount = (allTodos['undated'] || []).length;
     const datedCount = (allTodos[selectedDateKey] || []).length;
 
-    // --- FORM STATES (Unified options for Create & Edit) ---
-    // Create Form State
-    const [newTitle, setNewTitle] = useState('');
-    const [newPriority, setNewPriority] = useState<Priority>('medium');
-    const [newProjectId, setNewProjectId] = useState<number | null>(null);
-    const [newAssignee, setNewAssignee] = useState<string>('');
-    const [newIsUndated, setNewIsUndated] = useState(false);
-    const [newDueDate, setNewDueDate] = useState(selectedDateKey);
-    const [newHasEndDate, setNewHasEndDate] = useState(false);
-    const [newEndDate, setNewEndDate] = useState(selectedDateKey);
-    
-    const [newHasTime, setNewHasTime] = useState(false);
-    const [newStartTime, setNewStartTime] = useState('09:00');
-    const [newEndTime, setNewEndTime] = useState('10:00');
-
-    const [newHasReminder, setNewHasReminder] = useState(false);
-    const [newReminderType, setNewReminderType] = useState('0');
-    const [newCustomReminderDate, setNewCustomReminderDate] = useState('');
-    const [newCustomReminderTime, setNewCustomReminderTime] = useState('');
-
-    const [newHasRecurrence, setNewHasRecurrence] = useState(false);
-    const [newRecurrence, setNewRecurrence] = useState<RecurrenceRule>({ frequency: 'none' });
-
-    const [newNotes, setNewNotes] = useState('');
-    const [newSubtasks, setNewSubtasks] = useState<Subtask[]>([]);
-    const [newSubtaskInput, setNewSubtaskInput] = useState('');
-    const [isListeningCreate, setIsListeningCreate] = useState(false);
-
-    // Edit Form State
-    const [editTitle, setEditTitle] = useState('');
-    const [editCompleted, setEditCompleted] = useState(false);
-    const [editPriority, setEditPriority] = useState<Priority>('medium');
-    const [editProjectId, setEditProjectId] = useState<number | null>(null);
-    const [editAssignee, setEditAssignee] = useState<string>('');
-    const [editIsUndated, setEditIsUndated] = useState(false);
-    const [editDueDate, setEditDueDate] = useState('');
-    const [editHasEndDate, setEditHasEndDate] = useState(false);
-    const [editEndDate, setEditEndDate] = useState('');
-    
-    const [editHasTime, setEditHasTime] = useState(false);
-    const [editStartTime, setEditStartTime] = useState('');
-    const [editEndTime, setEditEndTime] = useState('');
-
-    const [editHasReminder, setEditHasReminder] = useState(false);
-    const [editReminderType, setEditReminderType] = useState('0');
-    const [editCustomReminderDate, setEditCustomReminderDate] = useState('');
-    const [editCustomReminderTime, setEditCustomReminderTime] = useState('');
-
-    const [editHasRecurrence, setEditHasRecurrence] = useState(false);
-    const [editRecurrence, setEditRecurrence] = useState<RecurrenceRule>({ frequency: 'none' });
-
-    const [editNotes, setEditNotes] = useState('');
-    const [editSubtasks, setEditSubtasks] = useState<Subtask[]>([]);
-    const [editSubtaskInput, setEditSubtaskInput] = useState('');
-    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-    const [isLoadingNotionNotes, setIsLoadingNotionNotes] = useState(false);
-
-    const handleOpenCreatePage = () => {
-        setNewTitle('');
-        setNewPriority('medium');
-        setNewProjectId(null);
-        setNewIsUndated(false);
-        setNewDueDate(selectedDateKey);
-        setNewHasEndDate(false);
-        setNewEndDate(selectedDateKey);
-        setNewHasTime(false);
-        setNewStartTime('09:00');
-        setNewEndTime('10:00');
-        setNewHasReminder(false);
-        setNewReminderType('0');
-        setNewCustomReminderDate('');
-        setNewCustomReminderTime('');
-        setNewHasRecurrence(false);
-        setNewRecurrence({ frequency: 'none' });
-        setNewNotes('');
-        setNewSubtasks([]);
-        setNewSubtaskInput('');
-        setSubPage('create');
-    };
-
-    const handleAddSubtaskCreate = () => {
-        if (!newSubtaskInput.trim()) return;
-        setNewSubtasks(prev => [...prev, { id: Date.now(), text: newSubtaskInput.trim(), completed: false }]);
-        setNewSubtaskInput('');
-    };
-
-    const handleRemoveSubtaskCreate = (id: number) => {
-        setNewSubtasks(prev => prev.filter(st => st.id !== id));
-    };
-
-    const handleCustomDayToggleCreate = (dayIndex: number) => {
-        setNewRecurrence(prev => {
-            const currentDays = prev.customDays || [];
-            const newDays = currentDays.includes(dayIndex)
-                ? currentDays.filter(d => d !== dayIndex)
-                : [...currentDays, dayIndex];
-            return { ...prev, customDays: newDays.sort((a, b) => a - b) };
-        });
-    };
-
-    const handleSaveNewTask = async () => {
-        if (!newTitle.trim()) return;
-        
-        let subtasksToSave = [...newSubtasks];
-        if (newSubtaskInput.trim()) {
-            subtasksToSave.push({ id: Date.now(), text: newSubtaskInput.trim(), completed: false });
-        }
-
-        let reminder_offset: Todo['reminder_offset'] = undefined;
-        let reminder_at: string | undefined = undefined;
-
-        if (newHasReminder && !newIsUndated) {
-            if (newReminderType === 'custom' && newCustomReminderTime) {
-                const reminderDateStr = newCustomReminderDate || newDueDate;
-                if (reminderDateStr) {
-                    const [year, month, day] = reminderDateStr.split('-').map(Number);
-                    const [hour, minute] = newCustomReminderTime.split(':').map(Number);
-                    const localReminderDate = new Date(year, month - 1, day, hour, minute);
-                    reminder_at = localReminderDate.toISOString();
-                }
-            } else if (newReminderType !== 'custom') {
-                reminder_offset = Number(newReminderType) as Todo['reminder_offset'];
-            }
-        }
-
-        const recurrenceToSave: RecurrenceRule = (newHasRecurrence && !newIsUndated) 
-            ? { ...newRecurrence, id: crypto.randomUUID() } 
-            : { frequency: 'none' };
-
-        if (onAddTodo) {
-            const currentSelectedProj = projects.find(p => p.id === newProjectId);
-            const isAdv = currentSelectedProj?.project_mode === 'advanced';
-            await onAddTodo(newTitle.trim(), {
-                projectId: newProjectId,
-                isUndated: newIsUndated,
-                dueDate: newIsUndated ? null : newDueDate,
-                endDate: newIsUndated || !newHasEndDate ? undefined : newEndDate,
-                priority: newPriority,
-                assignee: isAdv ? (newAssignee.trim() || null) : null,
-                assigned_to: isAdv ? (newAssignee.trim() || null) : null,
-                startTime: newHasTime && !newIsUndated ? newStartTime : undefined,
-                endTime: newHasTime && !newIsUndated ? newEndTime : undefined,
-                notes: newNotes.trim() ? newNotes.trim() : undefined,
-                subtasks: subtasksToSave.length > 0 ? subtasksToSave : undefined,
-                recurrence: recurrenceToSave,
-                reminder_offset,
-                reminder_at
-            });
-        }
-        handleBackToList();
-    };
-
-    const handleOpenEditPage = (task: Todo) => {
-        setActiveEditingTask(task);
-        setIsDrawerOpen(true); // Open the drawer instead of switching subpage
-    };
-
-    const handleAddSubtaskEdit = () => {
-        if (!editSubtaskInput.trim()) return;
-        setEditSubtasks(prev => [...prev, { id: Date.now(), text: editSubtaskInput.trim(), completed: false }]);
-        setEditSubtaskInput('');
-    };
-
-    const handleToggleSubtaskEdit = (id: number) => {
-        setEditSubtasks(prev => prev.map(st => st.id === id ? { ...st, completed: !st.completed } : st));
-    };
-
-    const handleRemoveSubtaskEdit = (id: number) => {
-        setEditSubtasks(prev => prev.filter(st => st.id !== id));
-    };
-
-    const handleCustomDayToggleEdit = (dayIndex: number) => {
-        setEditRecurrence(prev => {
-            const currentDays = prev.customDays || [];
-            const newDays = currentDays.includes(dayIndex)
-                ? currentDays.filter(d => d !== dayIndex)
-                : [...currentDays, dayIndex];
-            return { ...prev, customDays: newDays.sort((a, b) => a - b) };
-        });
-    };
-
-    const handleFetchNotionNotes = async () => {
-        if (!activeEditingTask?.notion_page_id) return;
-        setIsLoadingNotionNotes(true);
-        try {
-            const pageNotes = await NotionService.getPageNotes(activeEditingTask.notion_page_id);
-            if (pageNotes) {
-                setEditNotes(prev => prev ? `${prev}\n\n[Notas de Notion]\n${pageNotes}` : pageNotes);
-            }
-        } catch (error) {
-            console.error("Error fetching Notion notes:", error);
-        } finally {
-            setIsLoadingNotionNotes(false);
-        }
-    };
-
-    const handleSaveEditTask = () => {
-        if (!activeEditingTask || !editTitle.trim()) return;
-
-        let subtasksToSave = [...editSubtasks];
-        if (editSubtaskInput.trim()) {
-            subtasksToSave.push({ id: Date.now(), text: editSubtaskInput.trim(), completed: false });
-        }
-
-        let reminder_offset: Todo['reminder_offset'] = undefined;
-        let reminder_at: string | undefined = undefined;
-
-        if (editHasReminder && !editIsUndated) {
-            if (editReminderType === 'custom' && editCustomReminderTime) {
-                const reminderDateStr = editCustomReminderDate || editDueDate;
-                if (reminderDateStr) {
-                    const [year, month, day] = reminderDateStr.split('-').map(Number);
-                    const [hour, minute] = editCustomReminderTime.split(':').map(Number);
-                    const localReminderDate = new Date(year, month - 1, day, hour, minute);
-                    reminder_at = localReminderDate.toISOString();
-                }
-            } else if (editReminderType !== 'custom') {
-                reminder_offset = Number(editReminderType) as Todo['reminder_offset'];
-            }
-        }
-
-        const recurrenceToSave: RecurrenceRule = (editHasRecurrence && !editIsUndated) 
-            ? { ...editRecurrence, id: editRecurrence.id || crypto.randomUUID() } 
-            : { frequency: 'none' };
-
-        const selectedEditProj = projects.find(p => p.id === editProjectId);
-        const isEditAdv = selectedEditProj?.project_mode === 'advanced';
-
-        const updatedTask: Todo = {
-            ...activeEditingTask,
-            text: editTitle.trim(),
-            completed: editCompleted,
-            priority: editPriority,
-            project_id: editProjectId,
-            assignee: isEditAdv ? (editAssignee.trim() || null) : null,
-            assigned_to: isEditAdv ? (editAssignee.trim() || null) : null,
-            due_date: editIsUndated ? null : (editDueDate || null),
-            end_date: editIsUndated || !editHasEndDate ? null : (editEndDate || null),
-            start_time: editHasTime && !editIsUndated ? editStartTime : undefined,
-            end_time: editHasTime && !editIsUndated ? editEndTime : undefined,
-            notes: editNotes.trim() ? editNotes.trim() : undefined,
-            subtasks: subtasksToSave,
-            recurrence: recurrenceToSave,
-            reminder_offset,
-            reminder_at,
-            notification_sent: (activeEditingTask.reminder_at !== reminder_at || activeEditingTask.reminder_offset !== reminder_offset) 
-                ? false 
-                : activeEditingTask.notification_sent
-        };
-
-        if (onUpdateTodo) {
-            onUpdateTodo(updatedTask);
-        }
-        handleBackToList();
-    };
-
-    const handleDeleteTaskAction = () => {
-        if (!activeEditingTask) return;
-        if (onDeleteTodo) {
-            onDeleteTodo(activeEditingTask.id);
-        }
-        handleBackToList();
-    };
-
-    // Voice recognition helper
-    const toggleSpeechRecognition = (type: 'create' | 'edit') => {
-        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-        if (!SpeechRecognition) return;
-
-        if (type === 'create') {
-            if (isListeningCreate) {
-                setIsListeningCreate(false);
-                return;
-            }
-            const recognition = new SpeechRecognition();
-            recognition.lang = 'es-ES';
-            recognition.onstart = () => setIsListeningCreate(true);
-            recognition.onresult = (event: any) => {
-                const transcript = event.results[0][0].transcript;
-                setNewTitle(prev => (prev ? `${prev} ${transcript}` : transcript));
-            };
-            recognition.onend = () => setIsListeningCreate(false);
-            recognition.onerror = () => setIsListeningCreate(false);
-            recognition.start();
-        }
-    };
-
-    // Day labels
-    const dayLabels = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá'];
-
-    // ==========================================
-    // PAGE 2: CREATE TASK (PÁGINA NUEVA TAREA)
-    // ==========================================
-    const renderCreateForm = () => {
-        return (
-            <div className="flex flex-col w-full bg-white dark:bg-[#0c0c0c] text-zinc-900 dark:text-zinc-50 pb-20">
-                {/* Sticky Top Header */}
-                <div className="sticky top-0 z-40 bg-white/95 dark:bg-black/95 backdrop-blur-md px-4 py-3.5 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
-                    <button 
-                        type="button"
-                        onClick={handleBackToList}
-                        className="flex items-center gap-1.5 text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white px-2.5 py-1.5 rounded-xl active:bg-zinc-100 dark:active:bg-zinc-800 transition-colors"
-                    >
-                        <ArrowLeft className="w-4 h-4" />
-                        <span>Atrás</span>
-                    </button>
-                    <h2 className="text-sm font-bold tracking-tight text-zinc-900 dark:text-zinc-100">Nueva Tarea</h2>
-                    <button 
-                        type="button"
-                        onClick={handleSaveNewTask}
-                        disabled={!newTitle.trim()}
-                        className="text-xs font-bold px-4 py-1.5 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 disabled:opacity-40 active:scale-95 transition-all shadow-xs"
-                    >
-                        Guardar
-                    </button>
-                </div>
-
-                {/* Form Content */}
-                <div className="flex-1 px-4 sm:px-6 pt-5 space-y-4 max-w-lg mx-auto w-full box-border">
-                    {/* Title and Voice Recognition */}
-                    <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Título de la Tarea</label>
-                        <div className="relative">
-                            <textarea 
-                                value={newTitle}
-                                onChange={e => setNewTitle(e.target.value)}
-                                placeholder="¿Qué necesitas hacer?"
-                                rows={2}
-                                autoFocus
-                                className="w-full box-border px-3.5 py-2.5 pr-12 text-sm font-medium rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 focus:outline-hidden focus:ring-2 focus:ring-zinc-900 dark:focus:ring-white transition-all resize-none text-zinc-900 dark:text-zinc-50 placeholder-zinc-400"
-                            />
-                            <button
-                                type="button"
-                                onClick={() => toggleSpeechRecognition('create')}
-                                className={`absolute right-3 bottom-3 p-1.5 rounded-xl transition-colors ${
-                                    isListeningCreate 
-                                        ? 'bg-red-500 text-white animate-pulse' 
-                                        : 'bg-zinc-200/80 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300'
-                                }`}
-                                title="Dictar por voz"
-                            >
-                                {isListeningCreate ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Fecha y Rango de Días (Grounded & Box-fitted) */}
-                    <div className="p-3.5 rounded-2xl bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/70 space-y-2.5 box-border w-full overflow-hidden">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-700 dark:text-zinc-300">
-                                <CalendarIcon className="w-3.5 h-3.5 text-zinc-500" />
-                                <span>Fecha</span>
-                            </div>
-                            <label className="flex items-center gap-1.5 text-xs cursor-pointer text-zinc-500">
-                                <input 
-                                    type="checkbox" 
-                                    checked={newIsUndated} 
-                                    onChange={e => setNewIsUndated(e.target.checked)}
-                                    className="rounded border-zinc-300 dark:border-zinc-700 text-zinc-900 focus:ring-0 w-3.5 h-3.5"
-                                />
-                                <span>Sin fecha</span>
-                            </label>
-                        </div>
-
-                        {!newIsUndated && (
-                            <div className="space-y-2.5 pt-1">
-                                <div className="flex items-center justify-between text-xs">
-                                    <span className="text-zinc-500 text-[11px]">Tipo de asignación</span>
-                                    <div className="flex bg-zinc-200/60 dark:bg-zinc-800 p-0.5 rounded-xl">
-                                        <button
-                                            type="button"
-                                            onClick={() => setNewHasEndDate(false)}
-                                            className={`px-2 py-0.5 rounded-lg text-xs font-medium transition-all ${!newHasEndDate ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs' : 'text-zinc-500'}`}
-                                        >
-                                            Día único
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setNewHasEndDate(true);
-                                                if (!newEndDate) setNewEndDate(newDueDate);
-                                            }}
-                                            className={`px-2 py-0.5 rounded-lg text-xs font-medium transition-all ${newHasEndDate ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs' : 'text-zinc-500'}`}
-                                        >
-                                            Rango de días
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full">
-                                    <div className="min-w-0">
-                                        <span className="text-[10px] font-semibold text-zinc-500 block mb-1">
-                                            {newHasEndDate ? 'Fecha de inicio' : 'Fecha'}
-                                        </span>
-                                        <input 
-                                            type="date"
-                                            value={newDueDate}
-                                            onChange={e => setNewDueDate(e.target.value)}
-                                            className="w-full box-border px-3 py-2 text-xs rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 font-medium"
-                                        />
-                                    </div>
-
-                                    {newHasEndDate && (
-                                        <div className="min-w-0">
-                                            <span className="text-[10px] font-semibold text-zinc-500 block mb-1">Fecha de término</span>
-                                            <input 
-                                                type="date"
-                                                value={newEndDate}
-                                                min={newDueDate}
-                                                onChange={e => setNewEndDate(e.target.value)}
-                                                className="w-full box-border px-3 py-2 text-xs rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 font-medium"
-                                            />
-                                        </div>
-                                    )}
-                                </div>
-
-                                {newHasEndDate && (
-                                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 bg-zinc-100/80 dark:bg-zinc-800/60 p-2 rounded-xl">
-                                        ✨ Si la tarea no se completa, avanzará automáticamente día a día hasta completarse o alcanzar la fecha final.
-                                    </p>
-                                )}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Prioridad */}
-                    <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Prioridad</label>
-                        <div className="grid grid-cols-3 gap-2">
-                            {(['low', 'medium', 'high'] as Priority[]).map(p => {
-                                const labels: Record<Priority, string> = { low: 'Baja', medium: 'Media', high: 'Alta' };
-                                const colors: Record<Priority, string> = {
-                                    low: 'text-zinc-500',
-                                    medium: 'text-amber-500',
-                                    high: 'text-rose-500'
-                                };
-                                const activeStyles: Record<Priority, string> = {
-                                    low: 'bg-zinc-100 dark:bg-zinc-900 border-zinc-400 dark:border-zinc-600 font-bold',
-                                    medium: 'bg-amber-500/10 border-amber-500 font-bold',
-                                    high: 'bg-rose-500/10 border-rose-500 font-bold'
-                                };
-
-                                const isSelected = newPriority === p;
-
-                                return (
-                                    <button
-                                        key={p}
-                                        type="button"
-                                        onClick={() => setNewPriority(p)}
-                                        className={`py-2 px-2.5 rounded-2xl border text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95 ${
-                                            isSelected ? activeStyles[p] : 'bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-zinc-500'
-                                        }`}
-                                    >
-                                        <Flag className={`w-3 h-3 ${colors[p]}`} />
-                                        <span>{labels[p]}</span>
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
-
-                    {/* Proyecto */}
-                    {projects.length > 0 && (
-                        <div className="space-y-1.5">
-                            <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Proyecto</label>
-                            <select
-                                value={newProjectId || ''}
-                                onChange={e => {
-                                    const val = e.target.value ? Number(e.target.value) : null;
-                                    setNewProjectId(val);
-                                    setNewAssignee('');
-                                }}
-                                className="w-full box-border px-3.5 py-2.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs font-medium text-zinc-900 dark:text-zinc-50 focus:outline-hidden"
-                            >
-                                <option value="">Sin proyecto asociado</option>
-                                {projects.map(pr => (
-                                    <option key={pr.id} value={pr.id}>
-                                        {pr.emoji ? `${pr.emoji} ` : ''}{pr.name} {pr.project_mode === 'advanced' ? '(Avanzado)' : ''}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                    )}
-
-                    {/* Asignar a - SOLO si el proyecto seleccionado es avanzado */}
-                    {(() => {
-                        const sel = projects.find(p => p.id === newProjectId);
-                        if (sel?.project_mode !== 'advanced') return null;
-                        const mems = sel.members ? [...sel.members] : [];
-                        if (sel.owner_email && !mems.some(m => m.email === sel.owner_email)) {
-                            mems.unshift({ id: 'owner', name: sel.owner_name || 'Creador', email: sel.owner_email, role: 'owner' });
-                        }
-                        return (
-                            <div className="space-y-1.5 p-3 rounded-2xl bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/70">
-                                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Asignar a</label>
-                                <select
-                                    value={newAssignee}
-                                    onChange={e => setNewAssignee(e.target.value)}
-                                    className="w-full box-border px-3 py-2 rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-medium text-zinc-900 dark:text-zinc-100 focus:outline-hidden"
-                                >
-                                    <option value="">(Sin asignar)</option>
-                                    {mems.map(m => (
-                                        <option key={m.id || m.email || m.name} value={m.name || m.email}>
-                                            {m.name || m.email} {m.role ? `(${m.role})` : ''}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                        );
-                    })()}
-
-                    {/* Más opciones Toggle */}
-                    <button 
-                        type="button"
-                        onClick={() => setShowAdvancedCreate(!showAdvancedCreate)}
-                        className="w-full py-3 rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 text-xs font-semibold hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors"
-                    >
-                        {showAdvancedCreate ? 'Ocultar opciones' : '+ Más opciones'}
-                    </button>
-
-                    {showAdvancedCreate && (
-                        <motion.div 
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: 'auto' }}
-                            className="space-y-4"
-                        >
-                            {/* Horario (Añadir Hora) */}
-                            <div className="p-3.5 rounded-2xl bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/70 space-y-2 box-border w-full overflow-hidden">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
-                                        <Clock className="w-3.5 h-3.5 text-zinc-400" />
-                                        <span>Añadir Hora</span>
-                                    </span>
-                                    <input 
-                                        type="checkbox" 
-                                        checked={newHasTime} 
-                                        onChange={e => setNewHasTime(e.target.checked)} 
-                                        disabled={newIsUndated}
-                                        className="w-3.5 h-3.5 rounded text-zinc-900 border-zinc-300 dark:border-zinc-700 focus:ring-0 disabled:opacity-40"
-                                    />
-                                </div>
-
-                                {newHasTime && !newIsUndated && (
-                                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 animate-fade-in w-full">
-                                        <div className="min-w-0">
-                                            <label className="block text-[10px] font-semibold text-zinc-500 mb-1">Inicio</label>
-                                            <input 
-                                                type="time" 
-                                                value={newStartTime} 
-                                                onChange={e => setNewStartTime(e.target.value)} 
-                                                className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none font-medium"
-                                            />
-                                        </div>
-                                        <div className="min-w-0">
-                                            <label className="block text-[10px] font-semibold text-zinc-500 mb-1">Fin (opcional)</label>
-                                            <input 
-                                                type="time" 
-                                                value={newEndTime} 
-                                                onChange={e => setNewEndTime(e.target.value)} 
-                                                className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none font-medium"
-                                            />
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Recordatorio */}
-                            <div className="p-3.5 rounded-2xl bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/70 space-y-2 box-border w-full overflow-hidden">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
-                                        <Bell className="w-3.5 h-3.5 text-zinc-400" />
-                                        <span>Recordatorio</span>
-                                    </span>
-                                    <input 
-                                        type="checkbox" 
-                                        checked={newHasReminder} 
-                                        onChange={e => setNewHasReminder(e.target.checked)} 
-                                        disabled={newIsUndated}
-                                        className="w-3.5 h-3.5 rounded text-zinc-900 border-zinc-300 dark:border-zinc-700 focus:ring-0 disabled:opacity-40"
-                                    />
-                                </div>
-
-                                {newHasReminder && !newIsUndated && (
-                                    <div className="space-y-2 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 animate-fade-in w-full">
-                                        <select 
-                                            value={newReminderType} 
-                                            onChange={e => setNewReminderType(e.target.value)} 
-                                            className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
-                                        >
-                                            <option value="0">En el momento de la tarea</option>
-                                            <option value="10">10 minutos antes</option>
-                                            <option value="30">30 minutos antes</option>
-                                            <option value="60">1 hora antes</option>
-                                            <option value="1440">1 día antes</option>
-                                            <option value="custom">Personalizado...</option>
-                                        </select>
-
-                                        {newReminderType === 'custom' && (
-                                            <div className="grid grid-cols-2 gap-2 w-full">
-                                                <input 
-                                                    type="date" 
-                                                    value={newCustomReminderDate} 
-                                                    onChange={e => setNewCustomReminderDate(e.target.value)} 
-                                                    className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
-                                                />
-                                                <input 
-                                                    type="time" 
-                                                    value={newCustomReminderTime} 
-                                                    onChange={e => setNewCustomReminderTime(e.target.value)} 
-                                                    className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
-                                                />
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Repetir tarea (Recurrencia) */}
-                            <div className="p-3.5 rounded-2xl bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/70 space-y-2 box-border w-full overflow-hidden">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
-                                        <RefreshCw className="w-3.5 h-3.5 text-zinc-400" />
-                                        <span>Repetir tarea</span>
-                                    </span>
-                                    <input 
-                                        type="checkbox" 
-                                        checked={newHasRecurrence} 
-                                        onChange={e => setNewHasRecurrence(e.target.checked)} 
-                                        disabled={newIsUndated}
-                                        className="w-3.5 h-3.5 rounded text-zinc-900 border-zinc-300 dark:border-zinc-700 focus:ring-0 disabled:opacity-40"
-                                    />
-                                </div>
-
-                                {newHasRecurrence && !newIsUndated && (
-                                    <div className="space-y-2.5 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 animate-fade-in w-full">
-                                        <select 
-                                            value={newRecurrence?.frequency || 'none'} 
-                                            onChange={e => setNewRecurrence(r => ({ ...r, frequency: e.target.value as any }))} 
-                                            className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
-                                        >
-                                            <option value="none">Nunca</option>
-                                            <option value="daily">Diariamente</option>
-                                            <option value="weekly">Semanalmente</option>
-                                            <option value="custom">Días específicos</option>
-                                        </select>
-
-                                        {newRecurrence.frequency === 'custom' && (
-                                            <div className="flex justify-between gap-1 p-1 bg-white dark:bg-zinc-950 rounded-xl border border-zinc-200 dark:border-zinc-800 w-full box-border">
-                                                {dayLabels.map((dayLabel, index) => {
-                                                    const isSelected = newRecurrence.customDays?.includes(index);
-                                                    return (
-                                                        <button 
-                                                            key={index} 
-                                                            type="button" 
-                                                            onClick={() => handleCustomDayToggleCreate(index)} 
-                                                            className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                                                                isSelected ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 shadow-xs' : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800'
-                                                            }`}
-                                                        >
-                                                            {dayLabel}
-                                                        </button>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
-
-                                        <div className="w-full">
-                                            <label className="block text-[10px] font-semibold text-zinc-500 mb-1">Finaliza repetición (opcional)</label>
-                                            <input 
-                                                type="date" 
-                                                value={newRecurrence?.ends_on || ''} 
-                                                onChange={e => setNewRecurrence(r => ({ ...r, ends_on: e.target.value }))} 
-                                                className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
-                                            />
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Subtareas */}
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Subtareas</label>
-                                <div className="flex gap-2">
-                                    <input 
-                                        type="text"
-                                        value={newSubtaskInput}
-                                        onChange={e => setNewSubtaskInput(e.target.value)}
-                                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddSubtaskCreate(); } }}
-                                        placeholder="Añadir paso o subtarea..."
-                                        className="flex-1 box-border px-3.5 py-2 text-xs rounded-xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100"
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={handleAddSubtaskCreate}
-                                        className="px-3.5 py-2 bg-zinc-100 dark:bg-zinc-800 rounded-xl text-xs font-bold text-zinc-700 dark:text-zinc-200 active:scale-95 shrink-0"
-                                    >
-                                        Añadir
-                                    </button>
-                                </div>
-
-                                {newSubtasks.length > 0 && (
-                                    <div className="space-y-1.5 pt-1">
-                                        {newSubtasks.map(st => (
-                                            <div key={st.id} className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200/60 dark:border-zinc-800/60 text-xs">
-                                                <span className="text-zinc-700 dark:text-zinc-300 font-medium truncate">{st.text}</span>
-                                                <button 
-                                                    type="button"
-                                                    onClick={() => handleRemoveSubtaskCreate(st.id)}
-                                                    className="text-zinc-400 hover:text-rose-500 p-1"
-                                                >
-                                                    <X className="w-3.5 h-3.5" />
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Notas */}
-                            <div className="space-y-1.5 pb-6">
-                                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Notas Adicionales</label>
-                                <textarea 
-                                    value={newNotes}
-                                    onChange={e => setNewNotes(e.target.value)}
-                                    placeholder="Detalles, enlaces o notas..."
-                                    rows={3}
-                                    className="w-full box-border px-3.5 py-2.5 text-xs rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 resize-none focus:outline-hidden"
-                                />
-                            </div>
-                        </motion.div>
-                    )}
-                </div>
-            </div>
-        );
-    };
-
-    // ==========================================
-    // PAGE 3: EDIT TASK (PÁGINA DETALLES DE TAREA)
-    // ==========================================
-    const renderEditForm = () => {
-        if (!activeEditingTask) return null;
-
-        return (
-            <div className="flex flex-col min-h-full bg-white dark:bg-black w-full overflow-hidden">
-                {/* Header with Back, Title, Delete and Save */}
-                <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-zinc-100 dark:border-zinc-900/60 sticky top-0 bg-white/90 dark:bg-black/90 backdrop-blur-md z-10">
-                    <button 
-                        type="button"
-                        onClick={handleBackToList}
-                        className="flex items-center gap-1.5 text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white px-2.5 py-1.5 rounded-xl active:bg-zinc-100 dark:active:bg-zinc-800 transition-colors"
-                    >
-                        <ArrowLeft className="w-4 h-4" />
-                        <span>Atrás</span>
-                    </button>
-                    <h2 className="text-sm font-bold tracking-tight text-zinc-900 dark:text-zinc-100">Detalles de Tarea</h2>
-                    <div className="flex items-center gap-2">
-                        <button
-                            type="button"
-                            onClick={() => setShowDeleteConfirm(true)}
-                            className="p-1.5 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl transition-colors"
-                            title="Eliminar tarea"
-                        >
-                            <Trash2 className="w-4 h-4" />
-                        </button>
-                        <button 
-                            type="button"
-                            onClick={handleSaveEditTask}
-                            disabled={!editTitle.trim()}
-                            className="text-xs font-bold px-4 py-1.5 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 disabled:opacity-40 active:scale-95 transition-all shadow-xs"
-                        >
-                            Guardar
-                        </button>
-                    </div>
-                </div>
-
-                {/* Form Content */}
-                <div className="flex-1 px-4 sm:px-6 pt-5 space-y-4 max-w-lg mx-auto w-full box-border pb-24">
-                    {/* Status Toggle & Title */}
-                    <div className="flex items-start gap-3">
-                        <button
-                            type="button"
-                            onClick={() => setEditCompleted(!editCompleted)}
-                            className="mt-1 shrink-0"
-                            aria-label="Alternar estado completado"
-                        >
-                            {editCompleted ? (
-                                <CheckCircle2 className="w-7 h-7 text-emerald-500 fill-emerald-500/20" />
-                            ) : (
-                                <Circle className="w-7 h-7 text-zinc-300 dark:text-zinc-700" />
-                            )}
-                        </button>
-                        <div className="flex-1 min-w-0">
-                            <textarea 
-                                value={editTitle}
-                                onChange={e => setEditTitle(e.target.value)}
-                                rows={2}
-                                className={`w-full box-border px-3.5 py-2.5 text-sm font-semibold rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 resize-none focus:outline-hidden ${
-                                    editCompleted ? 'line-through opacity-50' : ''
-                                }`}
-                                placeholder="¿Qué hay que hacer?"
-                            />
-                        </div>
-                    </div>
-
-                    {/* Fecha (BÁSICA) */}
-                    <div className="space-y-1.5">
-                        <div className="flex items-center justify-between">
-                            <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Fecha</label>
-                            <button 
-                                type="button"
-                                onClick={() => setEditIsUndated(!editIsUndated)}
-                                className={`text-[10px] font-bold px-2 py-0.5 rounded-lg transition-all ${
-                                    editIsUndated ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900' : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'
-                                }`}
-                            >
-                                Sin fecha
-                            </button>
-                        </div>
-                        
-                        {!editIsUndated && (
-                            <div className="p-3.5 rounded-2xl bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/70 space-y-3 box-border w-full">
-                                <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-2 mb-1">
-                                    <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
-                                        <CalendarIcon className="w-3.5 h-3.5 text-zinc-400" />
-                                        <span>Seleccionar fechas</span>
-                                    </span>
-                                    <div className="flex gap-1">
-                                        <button 
-                                            type="button"
-                                            onClick={() => setEditHasEndDate(false)}
-                                            className={`px-2 py-0.5 rounded-lg text-xs font-medium transition-all ${!editHasEndDate ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs' : 'text-zinc-500'}`}
-                                        >
-                                            Un día
-                                        </button>
-                                        <button 
-                                            type="button"
-                                            onClick={() => {
-                                                setEditHasEndDate(true);
-                                                if (!editEndDate) setEditEndDate(editDueDate || selectedDateKey);
-                                            }}
-                                            className={`px-2 py-0.5 rounded-lg text-xs font-medium transition-all ${editHasEndDate ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs' : 'text-zinc-500'}`}
-                                        >
-                                            Rango de días
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full">
-                                    <div className="min-w-0">
-                                        <span className="text-[10px] font-semibold text-zinc-500 block mb-1">
-                                            {editHasEndDate ? 'Fecha de inicio' : 'Fecha'}
-                                        </span>
-                                        <input 
-                                            type="date"
-                                            value={editDueDate || ''}
-                                            onChange={e => setEditDueDate(e.target.value)}
-                                            className="w-full box-border px-3 py-2 text-xs rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 font-medium"
-                                        />
-                                    </div>
-
-                                    {editHasEndDate && (
-                                        <div className="min-w-0">
-                                            <span className="text-[10px] font-semibold text-zinc-500 block mb-1">Fecha de término</span>
-                                            <input 
-                                                type="date"
-                                                value={editEndDate || ''}
-                                                min={editDueDate || undefined}
-                                                onChange={e => setEditEndDate(e.target.value)}
-                                                className="w-full box-border px-3 py-2 text-xs rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 font-medium"
-                                            />
-                                        </div>
-                                    )}
-                                </div>
-
-                                {editHasEndDate && (
-                                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 bg-zinc-100/80 dark:bg-zinc-800/60 p-2 rounded-xl">
-                                        ✨ Si la tarea no se completa, avanzará automáticamente día a día hasta completarse o alcanzar la fecha final.
-                                    </p>
-                                )}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Prioridad */}
-                    <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Prioridad</label>
-                        <div className="grid grid-cols-3 gap-2">
-                            {(['low', 'medium', 'high'] as Priority[]).map(p => {
-                                const labels: Record<Priority, string> = { low: 'Baja', medium: 'Media', high: 'Alta' };
-                                const colors: Record<Priority, string> = {
-                                    low: 'text-zinc-500',
-                                    medium: 'text-amber-500',
-                                    high: 'text-rose-500'
-                                };
-                                const activeStyles: Record<Priority, string> = {
-                                    low: 'bg-zinc-100 dark:bg-zinc-900 border-zinc-400 dark:border-zinc-600 font-bold',
-                                    medium: 'bg-amber-500/10 border-amber-500 font-bold',
-                                    high: 'bg-rose-500/10 border-rose-500 font-bold'
-                                };
-
-                                const isSelected = editPriority === p;
-
-                                return (
-                                    <button
-                                        key={p}
-                                        type="button"
-                                        onClick={() => setEditPriority(p)}
-                                        className={`py-2 px-2.5 rounded-2xl border text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95 ${
-                                            isSelected ? activeStyles[p] : 'bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-zinc-500'
-                                        }`}
-                                    >
-                                        <Flag className={`w-3 h-3 ${colors[p]}`} />
-                                        <span>{labels[p]}</span>
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
-
-                    {/* Proyecto */}
-                    {projects.length > 0 && (
-                        <div className="space-y-1.5">
-                            <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Proyecto</label>
-                            <select
-                                value={editProjectId || ''}
-                                onChange={e => {
-                                    const val = e.target.value ? Number(e.target.value) : null;
-                                    setEditProjectId(val);
-                                    setEditAssignee('');
-                                }}
-                                className="w-full box-border px-3.5 py-2.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs font-medium text-zinc-900 dark:text-zinc-50 focus:outline-hidden"
-                            >
-                                <option value="">Sin proyecto asociado</option>
-                                {projects.map(pr => (
-                                    <option key={pr.id} value={pr.id}>
-                                        {pr.emoji ? `${pr.emoji} ` : ''}{pr.name} {pr.project_mode === 'advanced' ? '(Avanzado)' : ''}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                    )}
-
-                    {/* Asignar a - SOLO si el proyecto seleccionado es avanzado */}
-                    {(() => {
-                        const sel = projects.find(p => p.id === editProjectId);
-                        if (sel?.project_mode !== 'advanced') return null;
-                        const mems = sel.members ? [...sel.members] : [];
-                        if (sel.owner_email && !mems.some(m => m.email === sel.owner_email)) {
-                            mems.unshift({ id: 'owner', name: sel.owner_name || 'Creador', email: sel.owner_email, role: 'owner' });
-                        }
-                        return (
-                            <div className="space-y-1.5 p-3 rounded-2xl bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/70">
-                                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Asignar a</label>
-                                <select
-                                    value={editAssignee}
-                                    onChange={e => setEditAssignee(e.target.value)}
-                                    className="w-full box-border px-3 py-2 rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-medium text-zinc-900 dark:text-zinc-100 focus:outline-hidden"
-                                >
-                                    <option value="">(Sin asignar)</option>
-                                    {mems.map(m => (
-                                        <option key={m.id || m.email || m.name} value={m.name || m.email}>
-                                            {m.name || m.email} {m.role ? `(${m.role})` : ''}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                        );
-                    })()}
-
-                    {/* Más opciones Toggle */}
-                    <button 
-                        type="button"
-                        onClick={() => setShowAdvancedEdit(!showAdvancedEdit)}
-                        className="w-full py-3 rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 text-xs font-semibold hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors"
-                    >
-                        {showAdvancedEdit ? 'Ocultar opciones' : '+ Más opciones'}
-                    </button>
-
-                    {showAdvancedEdit && (
-                        <motion.div 
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: 'auto' }}
-                            className="space-y-4"
-                        >
-                            {/* Horario (Añadir Hora) */}
-                            <div className="p-3.5 rounded-2xl bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/70 space-y-2 box-border w-full overflow-hidden">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
-                                        <Clock className="w-3.5 h-3.5 text-zinc-400" />
-                                        <span>Añadir Hora</span>
-                                    </span>
-                                    <input 
-                                        type="checkbox" 
-                                        checked={editHasTime} 
-                                        onChange={e => setEditHasTime(e.target.checked)} 
-                                        disabled={editIsUndated}
-                                        className="w-3.5 h-3.5 rounded text-zinc-900 border-zinc-300 dark:border-zinc-700 focus:ring-0 disabled:opacity-40"
-                                    />
-                                </div>
-
-                                {editHasTime && !editIsUndated && (
-                                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 animate-fade-in w-full">
-                                        <div className="min-w-0">
-                                            <label className="block text-[10px] font-semibold text-zinc-500 mb-1">Inicio</label>
-                                            <input 
-                                                type="time" 
-                                                value={editStartTime || ''} 
-                                                onChange={e => setEditStartTime(e.target.value)} 
-                                                className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none font-medium"
-                                            />
-                                        </div>
-                                        <div className="min-w-0">
-                                            <label className="block text-[10px] font-semibold text-zinc-500 mb-1">Fin (opcional)</label>
-                                            <input 
-                                                type="time" 
-                                                value={editEndTime || ''} 
-                                                onChange={e => setEditEndTime(e.target.value)} 
-                                                className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none font-medium"
-                                            />
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Recordatorio */}
-                            <div className="p-3.5 rounded-2xl bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/70 space-y-2 box-border w-full overflow-hidden">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
-                                        <Bell className="w-3.5 h-3.5 text-zinc-400" />
-                                        <span>Recordatorio</span>
-                                    </span>
-                                    <input 
-                                        type="checkbox" 
-                                        checked={editHasReminder} 
-                                        onChange={e => setEditHasReminder(e.target.checked)} 
-                                        disabled={editIsUndated}
-                                        className="w-3.5 h-3.5 rounded text-zinc-900 border-zinc-300 dark:border-zinc-700 focus:ring-0 disabled:opacity-40"
-                                    />
-                                </div>
-
-                                {editHasReminder && !editIsUndated && (
-                                    <div className="space-y-2 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 animate-fade-in w-full">
-                                        <select 
-                                            value={editReminderType} 
-                                            onChange={e => setEditReminderType(e.target.value)} 
-                                            className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
-                                        >
-                                            <option value="0">En el momento de la tarea</option>
-                                            <option value="10">10 minutos antes</option>
-                                            <option value="30">30 minutos antes</option>
-                                            <option value="60">1 hora antes</option>
-                                            <option value="1440">1 día antes</option>
-                                            <option value="custom">Personalizado...</option>
-                                        </select>
-
-                                        {editReminderType === 'custom' && (
-                                            <div className="grid grid-cols-2 gap-2 w-full">
-                                                <input 
-                                                    type="date" 
-                                                    value={editCustomReminderDate} 
-                                                    onChange={e => setEditCustomReminderDate(e.target.value)} 
-                                                    className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
-                                                />
-                                                <input 
-                                                    type="time" 
-                                                    value={editCustomReminderTime} 
-                                                    onChange={e => setEditCustomReminderTime(e.target.value)} 
-                                                    className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
-                                                />
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Repetir tarea (Recurrencia) */}
-                            <div className="p-3.5 rounded-2xl bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/70 space-y-2 box-border w-full overflow-hidden">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
-                                        <RefreshCw className="w-3.5 h-3.5 text-zinc-400" />
-                                        <span>Repetir tarea</span>
-                                    </span>
-                                    <input 
-                                        type="checkbox" 
-                                        checked={editHasRecurrence} 
-                                        onChange={e => setEditHasRecurrence(e.target.checked)} 
-                                        disabled={editIsUndated}
-                                        className="w-3.5 h-3.5 rounded text-zinc-900 border-zinc-300 dark:border-zinc-700 focus:ring-0 disabled:opacity-40"
-                                    />
-                                </div>
-
-                                {editHasRecurrence && !editIsUndated && (
-                                    <div className="space-y-2.5 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 animate-fade-in w-full">
-                                        <select 
-                                            value={editRecurrence?.frequency || 'none'} 
-                                            onChange={e => setEditRecurrence(r => ({ ...r, frequency: e.target.value as any }))} 
-                                            className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
-                                        >
-                                            <option value="none">Nunca</option>
-                                            <option value="daily">Diariamente</option>
-                                            <option value="weekly">Semanalmente</option>
-                                            <option value="custom">Días específicos</option>
-                                        </select>
-
-                                        {editRecurrence?.frequency === 'custom' && (
-                                            <div className="flex justify-between gap-1 p-1 bg-white dark:bg-zinc-950 rounded-xl border border-zinc-200 dark:border-zinc-800 w-full box-border">
-                                                {dayLabels.map((dayLabel, index) => {
-                                                    const isSelected = editRecurrence.customDays?.includes(index);
-                                                    return (
-                                                        <button 
-                                                            key={index} 
-                                                            type="button" 
-                                                            onClick={() => handleCustomDayToggleEdit(index)} 
-                                                            className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                                                                isSelected ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 shadow-xs' : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800'
-                                                            }`}
-                                                        >
-                                                            {dayLabel}
-                                                        </button>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
-
-                                        <div className="w-full">
-                                            <label className="block text-[10px] font-semibold text-zinc-500 mb-1">Finaliza repetición (opcional)</label>
-                                            <input 
-                                                type="date" 
-                                                value={editRecurrence?.ends_on || ''} 
-                                                onChange={e => setEditRecurrence(r => ({ ...r, ends_on: e.target.value }))} 
-                                                className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
-                                            />
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Subtareas */}
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Subtareas</label>
-                                <div className="flex gap-2">
-                                    <input 
-                                        type="text"
-                                        value={editSubtaskInput}
-                                        onChange={e => setEditSubtaskInput(e.target.value)}
-                                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddSubtaskEdit(); } }}
-                                        placeholder="Añadir paso o subtarea..."
-                                        className="flex-1 box-border px-3.5 py-2 text-xs rounded-xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100"
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={handleAddSubtaskEdit}
-                                        className="px-3.5 py-2 bg-zinc-100 dark:bg-zinc-800 rounded-xl text-xs font-bold text-zinc-700 dark:text-zinc-200 active:scale-95 shrink-0"
-                                    >
-                                        Añadir
-                                    </button>
-                                </div>
-
-                                {editSubtasks.length > 0 && (
-                                    <div className="space-y-1.5 pt-1">
-                                        {editSubtasks.map(st => (
-                                            <div key={st.id} className="flex items-center gap-2 p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200/60 dark:border-zinc-800/60 text-xs">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleToggleSubtaskEdit(st.id)}
-                                                    className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
-                                                >
-                                                    {st.completed ? (
-                                                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                                                    ) : (
-                                                        <Circle className="w-4 h-4 text-zinc-400" />
-                                                    )}
-                                                </button>
-                                                <span className={`flex-1 truncate ${st.completed ? 'line-through text-zinc-400' : 'text-zinc-700 dark:text-zinc-300 font-medium'}`}>
-                                                    {st.text}
-                                                </span>
-                                                <button 
-                                                    type="button"
-                                                    onClick={() => handleRemoveSubtaskEdit(st.id)}
-                                                    className="text-zinc-400 hover:text-rose-500 p-1"
-                                                >
-                                                    <X className="w-3.5 h-3.5" />
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Notas */}
-                            <div className="space-y-1.5">
-                                <div className="flex items-center justify-between">
-                                    <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Notas</label>
-                                    {activeEditingTask?.notion_page_id && (
-                                        <button
-                                            type="button"
-                                            onClick={handleFetchNotionNotes}
-                                            disabled={isLoadingNotionNotes}
-                                            className="text-[11px] font-semibold text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 flex items-center gap-1 disabled:opacity-50"
-                                        >
-                                            <ExternalLink className="w-3 h-3" />
-                                            <span>{isLoadingNotionNotes ? 'Cargando...' : 'Ver notas de Notion'}</span>
-                                        </button>
-                                    )}
-                                </div>
-                                <textarea 
-                                    value={editNotes}
-                                    onChange={e => setEditNotes(e.target.value)}
-                                    placeholder="Detalles de la tarea..."
-                                    rows={3}
-                                    className="w-full box-border px-3.5 py-2.5 text-xs rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 resize-none focus:outline-hidden"
-                                />
-                            </div>
-                        </motion.div>
-                    )}
-
-                    {/* Eliminar Tarea */}
-                    <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800">
-                        {showDeleteConfirm ? (
-                            <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 space-y-3 text-center">
-                                <p className="text-xs font-semibold text-rose-800 dark:text-rose-300">
-                                    ¿Estás seguro de eliminar esta tarea?
-                                </p>
-                                <div className="flex gap-2 justify-center">
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowDeleteConfirm(false)}
-                                        className="px-4 py-1.5 text-xs font-medium rounded-xl bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300"
-                                    >
-                                        Cancelar
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={handleDeleteTaskAction}
-                                        className="px-4 py-1.5 text-xs font-bold rounded-xl bg-rose-600 text-white shadow-xs"
-                                    >
-                                        Sí, eliminar
-                                    </button>
-                                </div>
-                            </div>
-                        ) : (
-                            <button
-                                type="button"
-                                onClick={() => setShowDeleteConfirm(true)}
-                                className="w-full py-3 rounded-2xl border border-rose-200 dark:border-rose-900/50 text-rose-600 dark:text-rose-400 font-semibold text-xs flex items-center justify-center gap-2 active:bg-rose-50 dark:active:bg-rose-950/50 transition-colors"
-                            >
-                                <Trash2 className="w-4 h-4" />
-                                <span>Eliminar Tarea</span>
-                            </button>
-                        )}
-                    </div>
-                </div>
-            </div>
-        );
-    };
-
-    // ==========================================
-    // PAGE 1: TASK LIST (PÁGINA PRINCIPAL TAREAS)
-    // ==========================================
     return (
-        <div className="flex flex-col min-h-full bg-gradient-to-b from-purple-100/70 via-slate-50 to-white dark:from-purple-950/25 dark:via-zinc-950 dark:to-black text-zinc-900 dark:text-zinc-50 pb-40 pt-10 px-4 sm:px-6 font-sans">
-            {/* Header: Greeting & Add Task */}
-            <div className="flex justify-between items-start mb-6">
+        <div className="flex flex-col min-h-full bg-white dark:bg-black text-zinc-900 dark:text-zinc-50 pb-40 pt-8 px-4 sm:px-6">
+            {/* Header: Title and Add Task Button */}
+            <div className="flex justify-between items-center mb-4">
                 <div>
-                    <span className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 tracking-wider uppercase block">
-                        PRODUCTIVIDAD
-                    </span>
-                    <h1 className="text-2xl font-black tracking-tight text-zinc-900 dark:text-white mt-0.5">
-                        Buenas noches, {userName}
-                    </h1>
+                    <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">Tareas</h1>
+                    <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mt-0.5">
+                        {completedCount} de {totalCount} completadas
+                    </p>
                 </div>
                 <button 
                     type="button"
-                    onClick={() => setIsDrawerOpen(true)}
-                    className="w-12 h-12 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full flex items-center justify-center active:scale-95 transition-all shadow-lg shadow-indigo-500/25 cursor-pointer"
+                    onClick={handleOpenCreateDrawer}
+                    className="w-10 h-10 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-full flex items-center justify-center active:scale-95 transition-all shadow-sm cursor-pointer"
                     title="Nueva Tarea"
                     aria-label="Nueva Tarea"
                 >
-                    <Plus className="w-6 h-6" />
+                    <Plus className="w-5 h-5" />
                 </button>
-                <MobileTaskDrawer 
-                    isOpen={isDrawerOpen} 
-                    onClose={() => {setIsDrawerOpen(false); setActiveEditingTask(null);}} 
-                    onAddTask={onAddTodo}
-                    onEditTask={(_, text, options) => {
-                        if (activeEditingTask && onUpdateTodo) {
-                             const updatedTask: Todo = { 
-                                 ...activeEditingTask, 
-                                 text, 
-                                 ...options,
-                                 end_date: options?.end_date !== undefined ? options.end_date : (options?.endDate !== undefined ? options.endDate : null)
-                             };
-                             onUpdateTodo(updatedTask);
-                        }
-                    }}
-                    taskToEdit={activeEditingTask}
-                    projects={projects}
-                />
             </div>
 
-            {/* Day Switcher */}
-            <div className="flex items-center justify-between mb-4 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md p-1.5 rounded-2xl border border-zinc-200/60 dark:border-zinc-800/80 shadow-2xs">
+            {/* Selector de Día */}
+            <div className="flex items-center justify-between mb-3 bg-zinc-100/80 dark:bg-zinc-900/80 p-1.5 rounded-2xl border border-zinc-200/50 dark:border-zinc-800/60">
                 <button 
                     type="button"
                     onClick={handlePrevDay} 
-                    className="w-9 h-9 flex items-center justify-center rounded-xl active:bg-zinc-100 dark:active:bg-zinc-800 text-zinc-600 dark:text-zinc-400 transition-colors"
+                    className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-white dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 transition-colors cursor-pointer"
                     aria-label="Día anterior"
                 >
                     <ChevronLeft className="w-4 h-4" />
@@ -1481,16 +183,16 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
                 <button 
                     type="button"
                     onClick={handleResetToToday}
-                    className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-zinc-800 dark:text-zinc-200"
+                    className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-xl hover:bg-white dark:hover:bg-zinc-800 transition-colors text-zinc-800 dark:text-zinc-200 cursor-pointer"
                 >
-                    <CalendarIcon className="w-3.5 h-3.5 text-indigo-500" />
+                    <CalendarIcon className="w-3.5 h-3.5 text-zinc-400" />
                     <span>{isSelectedToday ? `Hoy (${format(selectedDate, 'd MMM', { locale: es })})` : getRelativeDateLabel(selectedDate)}</span>
                 </button>
 
                 <button 
                     type="button"
                     onClick={handleNextDay} 
-                    className="w-9 h-9 flex items-center justify-center rounded-xl active:bg-zinc-100 dark:active:bg-zinc-800 text-zinc-600 dark:text-zinc-400 transition-colors"
+                    className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-white dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 transition-colors cursor-pointer"
                     aria-label="Día siguiente"
                 >
                     <ChevronRight className="w-4 h-4" />
@@ -1498,14 +200,14 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
             </div>
 
             {/* View Filter Tabs: Para este día vs Sin Fecha */}
-            <div className="flex space-x-2 mb-6">
+            <div className="flex space-x-1.5 mb-3">
                 <button 
                     type="button"
                     onClick={() => setTabView('dated')}
-                    className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
+                    className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                         tabView === 'dated' 
                             ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 shadow-xs' 
-                            : 'bg-white/80 dark:bg-zinc-900/80 text-zinc-500 border border-zinc-200/60 dark:border-zinc-800/60'
+                            : 'bg-zinc-100 dark:bg-zinc-900/60 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
                     }`}
                 >
                     <CalendarIcon className="w-3.5 h-3.5" />
@@ -1521,10 +223,10 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
                 <button 
                     type="button"
                     onClick={() => setTabView('undated')}
-                    className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
+                    className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                         tabView === 'undated' 
                             ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 shadow-xs' 
-                            : 'bg-white/80 dark:bg-zinc-900/80 text-zinc-500 border border-zinc-200/60 dark:border-zinc-800/60'
+                            : 'bg-zinc-100 dark:bg-zinc-900/60 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
                     }`}
                 >
                     <ListTodo className="w-3.5 h-3.5" />
@@ -1539,214 +241,185 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
                 </button>
             </div>
 
-            {/* SECCIÓN HOY */}
-            <div className="space-y-3 mb-7">
-                <h2 className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
-                    HOY
-                </h2>
-
-                <div className="space-y-3">
-                    {sortedTasks.map(task => {
-                        const project = projects.find(p => p.id === task.project_id);
-                        const isHigh = task.priority === 'high';
-                        const accentColor = isHigh ? 'bg-rose-500' : (project?.color || 'bg-indigo-500');
-
-                        return (
-                            <div key={task.id} className="flex flex-col">
-                                <div
-                                    className={`bg-white dark:bg-zinc-900/90 rounded-2xl p-4 shadow-2xs border border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between gap-3 transition-all hover:shadow-xs ${
-                                        task.completed ? 'opacity-60' : ''
-                                    }`}
-                                >
-                                    {/* Accent Vertical Bar */}
-                                    <div 
-                                        className="w-1.5 self-stretch rounded-full shrink-0" 
-                                        style={{ backgroundColor: project?.color || (isHigh ? '#f43f5e' : '#6366f1') }}
-                                    />
-
-                                    {/* Task Main Details */}
-                                    <div 
-                                        className="flex-1 min-w-0 cursor-pointer"
-                                        onClick={() => handleOpenEditPage(task)}
-                                    >
-                                        <h3 className={`text-sm font-bold leading-snug ${
-                                            task.completed ? 'line-through text-zinc-400 dark:text-zinc-500' : 'text-zinc-900 dark:text-white'
-                                        }`}>
-                                            {task.text}
-                                        </h3>
-                                        <div className="flex items-center gap-2 mt-1 text-xs text-zinc-500 dark:text-zinc-400 font-medium">
-                                            {task.start_time && (
-                                                <span>{formatTime12h(task.start_time)}{task.end_time ? ` - ${formatTime12h(task.end_time)}` : ''}</span>
-                                            )}
-                                            {!task.start_time && task.due_date && (
-                                                <span>{formatDateRangeSafe(task.due_date, task.end_date)}</span>
-                                            )}
-                                            {project && (
-                                                <span className="text-indigo-600 dark:text-indigo-400 font-semibold">• {project.name}</span>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Right Checkmark Button */}
-                                    <button 
-                                        type="button"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            toggleTodo(task.id);
-                                        }}
-                                        className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-all ${
-                                            task.completed
-                                                ? 'bg-emerald-500 text-white shadow-xs'
-                                                : 'bg-indigo-500/15 dark:bg-indigo-500/25 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-600 hover:text-white'
-                                        }`}
-                                        aria-label={`Marcar ${task.text}`}
-                                    >
-                                        <Check className="w-4 h-4 stroke-[3]" />
-                                    </button>
-                                </div>
-                            </div>
-                        );
-                    })}
-
-                    {sortedTasks.length === 0 && (
-                        <div className="text-center py-10 px-4 bg-white/60 dark:bg-zinc-900/40 rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-800">
-                            <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
-                                {tabView === 'dated' ? 'Sin tareas programadas para hoy' : 'Sin tareas en esta vista'}
-                            </p>
-                        </div>
-                    )}
+            {/* Barra de Progreso Minimalista */}
+            {totalCount > 0 && (
+                <div className="mb-4 flex items-center gap-2.5 px-1">
+                    <div className="flex-1 h-1.5 bg-zinc-100 dark:bg-zinc-900 rounded-full overflow-hidden">
+                        <div 
+                            className="h-full bg-zinc-900 dark:bg-white transition-all duration-500 ease-out rounded-full"
+                            style={{ width: `${progress}%` }}
+                        />
+                    </div>
+                    <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400">{progress}%</span>
                 </div>
-            </div>
+            )}
 
-            {/* SECCIÓN MIS CATEGORÍAS / PROYECTOS */}
-            <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                    <h2 className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
-                        MIS PROYECTOS Y CATEGORÍAS
-                    </h2>
-                    <span className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400">
-                        {projects.length} en total
-                    </span>
-                </div>
+            {/* Lista de Tareas Minimalista */}
+            <div className="space-y-2">
+                {sortedTasks.map(task => {
+                    const project = projects.find(p => p.id === task.project_id);
+                    const subtasksCount = task.subtasks?.length || 0;
+                    const completedSubtasks = task.subtasks?.filter(s => s.completed).length || 0;
 
-                <div className="grid grid-cols-2 gap-3">
-                    {projects.map((proj, index) => {
-                        const projTasks = (allTodos[selectedDateKey] || []).filter(t => t.project_id === proj.id && !t.completed);
-                        const pastelBgs = [
-                            'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400',
-                            'bg-rose-100 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400',
-                            'bg-indigo-100 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400',
-                            'bg-cyan-100 dark:bg-cyan-950/50 text-cyan-600 dark:text-cyan-400',
-                            'bg-amber-100 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400',
-                            'bg-purple-100 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400',
-                        ];
-                        const iconBg = pastelBgs[index % pastelBgs.length];
-
-                        return (
-                            <div 
-                                key={proj.id}
-                                className="bg-white dark:bg-zinc-900/90 rounded-2xl p-3.5 shadow-2xs border border-zinc-100 dark:border-zinc-800/80 flex flex-col justify-between min-h-[125px] active:scale-[0.98] transition-all cursor-pointer hover:shadow-xs"
-                                onClick={() => {
-                                    setTabView('dated');
-                                }}
+                    return (
+                        <div key={task.id} className="flex flex-col">
+                            <div
+                                className={`flex items-start gap-3 p-3.5 rounded-2xl border transition-all ${
+                                    task.completed 
+                                        ? 'bg-zinc-50/50 dark:bg-zinc-900/30 border-zinc-150/60 dark:border-zinc-800/40 opacity-60' 
+                                        : 'bg-white dark:bg-[#121214] border-zinc-150 dark:border-zinc-800/80 shadow-2xs hover:border-zinc-300 dark:hover:border-zinc-700'
+                                }`}
                             >
-                                <div className="flex items-center justify-between">
-                                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-sm ${iconBg}`}>
-                                        {proj.emoji || '📦'}
-                                    </div>
-                                    <div className="w-6 h-6 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-400 flex items-center justify-center text-xs">
-                                        <ChevronRight className="w-3.5 h-3.5" />
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <h3 className="text-xs font-bold text-zinc-900 dark:text-white mt-2.5 line-clamp-2 leading-snug">
-                                        {proj.name}
-                                    </h3>
-                                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
-                                        {projTasks.length} pendientes
+                                <button 
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleTodo(task.id);
+                                    }}
+                                    className="mt-0.5 shrink-0 text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors cursor-pointer"
+                                    aria-label={`Marcar ${task.text} como ${task.completed ? 'incompleta' : 'completada'}`}
+                                >
+                                    {task.completed ? (
+                                        <CheckCircle2 className="w-5 h-5 text-emerald-500 fill-emerald-500/10" />
+                                    ) : (
+                                        <Circle className="w-5 h-5 text-zinc-300 dark:text-zinc-600 hover:text-zinc-500" />
+                                    )}
+                                </button>
+                                
+                                <div 
+                                    className="flex-1 min-w-0 cursor-pointer"
+                                    onClick={() => handleOpenEditDrawer(task)}
+                                >
+                                    <p className={`text-sm font-medium leading-snug break-words ${
+                                        task.completed ? 'line-through text-zinc-400 dark:text-zinc-500' : 'text-zinc-900 dark:text-zinc-100'
+                                    }`}>
+                                        {task.text}
                                     </p>
-                                    <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 mt-1 block">
-                                        {proj.project_mode === 'advanced' ? 'Avanzado' : 'Personal'}
-                                    </span>
+                                    
+                                    {/* Badges / Tags Minimalistas */}
+                                    <div className="flex flex-wrap items-center gap-2 mt-1.5 text-[11px] text-zinc-500 dark:text-zinc-400">
+                                        {/* Project Tag */}
+                                        {project && (
+                                            <span className="inline-flex items-center gap-1 font-medium">
+                                                <span 
+                                                    className="w-2 h-2 rounded-full shrink-0" 
+                                                    style={{ backgroundColor: project.color || '#a1a1aa' }}
+                                                />
+                                                <span>{project.name}</span>
+                                            </span>
+                                        )}
+
+                                        {/* Time */}
+                                        {task.start_time && (
+                                            <span className="inline-flex items-center gap-1">
+                                                <Clock className="w-3 h-3 text-zinc-400" />
+                                                <span>{formatTime12h(task.start_time)}{task.end_time ? ` - ${formatTime12h(task.end_time)}` : ''}</span>
+                                            </span>
+                                        )}
+
+                                        {/* Date Range if different from selected day */}
+                                        {task.due_date && tabView === 'undated' && (
+                                            <span className="inline-flex items-center gap-1">
+                                                <CalendarIcon className="w-3 h-3 text-zinc-400" />
+                                                <span>{formatDateRangeSafe(task.due_date, task.end_date)}</span>
+                                            </span>
+                                        )}
+
+                                        {/* Priority Indicator */}
+                                        {task.priority === 'high' && (
+                                            <span className="inline-flex items-center gap-0.5 text-rose-500 font-semibold">
+                                                <Flag className="w-3 h-3" />
+                                                <span>Alta</span>
+                                            </span>
+                                        )}
+                                        {task.priority === 'medium' && (
+                                            <span className="inline-flex items-center gap-0.5 text-amber-500 font-medium">
+                                                <Flag className="w-3 h-3" />
+                                                <span>Media</span>
+                                            </span>
+                                        )}
+
+                                        {/* Subtasks pill */}
+                                        {subtasksCount > 0 && (
+                                            <span 
+                                                className="inline-flex items-center gap-1 hover:text-zinc-700 dark:hover:text-zinc-200 cursor-pointer"
+                                                onClick={(e) => toggleExpandTask(task.id, e)}
+                                            >
+                                                <CheckSquare className="w-3 h-3" />
+                                                <span>{completedSubtasks}/{subtasksCount}</span>
+                                                <ChevronDown className={`w-3 h-3 transition-transform ${expandedTasks.includes(task.id) ? 'rotate-180' : ''}`} />
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
-                        );
-                    })}
-
-                    {projects.length === 0 && (
-                        <div className="col-span-2 py-8 text-center bg-white/60 dark:bg-zinc-900/40 rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-800">
-                            <p className="text-xs text-zinc-500">No hay proyectos creados aún.</p>
+                            
+                            {/* Expanded Subtasks */}
+                            {expandedTasks.includes(task.id) && subtasksCount > 0 && (
+                                <div className="pl-11 pr-3 pb-2 pt-1.5 space-y-1.5" onClick={e => e.stopPropagation()}>
+                                    {task.subtasks?.map(subtask => (
+                                        <label key={subtask.id} className="flex items-center gap-2.5 cursor-pointer group">
+                                            <div className="relative flex items-center justify-center">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={subtask.completed}
+                                                    onChange={() => {
+                                                        const newSubtasks = task.subtasks!.map(s => s.id === subtask.id ? { ...s, completed: !s.completed } : s);
+                                                        if (onUpdateTodo) {
+                                                            onUpdateTodo({ ...task, subtasks: newSubtasks });
+                                                        }
+                                                    }}
+                                                    className="sr-only"
+                                                />
+                                                <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors ${subtask.completed ? 'bg-zinc-900 border-zinc-900 dark:bg-white dark:border-white' : 'border-zinc-300 dark:border-zinc-600'}`}>
+                                                    {subtask.completed && <Check className="w-2.5 h-2.5 text-white dark:text-zinc-900" strokeWidth={3} />}
+                                                </div>
+                                            </div>
+                                            <span className={`text-xs ${subtask.completed ? 'line-through text-zinc-400 dark:text-zinc-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
+                                                {subtask.title || subtask.text}
+                                            </span>
+                                        </label>
+                                    ))}
+                                </div>
+                            )}
                         </div>
-                    )}
-                </div>
+                    );
+                })}
+            
+                {sortedTasks.length === 0 && (
+                    <div className="text-center py-16 px-4 bg-zinc-50/50 dark:bg-zinc-900/30 rounded-3xl border border-dashed border-zinc-200 dark:border-zinc-800">
+                        <div className="w-10 h-10 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center mx-auto mb-2.5 text-zinc-400">
+                            <CheckSquare className="w-4 h-4" />
+                        </div>
+                        <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                            {tabView === 'dated' ? 'No hay tareas para este día' : 'No hay tareas sin fecha'}
+                        </p>
+                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                            Toca el botón + para añadir una tarea.
+                        </p>
+                    </div>
+                )}
             </div>
 
-            {/* Create Task Bottom Sheet */}
-            <AnimatePresence>
-                {subPage === 'create' && (
-                    <div className="fixed inset-0 z-[100010] flex items-end justify-center bg-black/40 backdrop-blur-xs" onClick={handleBackToList}>
-                        <motion.div 
-                            initial={{ y: '100%' }}
-                            animate={{ y: 0 }}
-                            exit={{ y: '100%' }}
-                            transition={{ type: 'spring', damping: 28, stiffness: 240 }}
-                            drag="y"
-                            dragConstraints={{ top: 0 }}
-                            dragElastic={{ top: 0.1, bottom: 0.8 }}
-                            onDragEnd={(e, info) => {
-                                if (info.velocity.y > 100 || info.offset.y > 150) {
-                                    handleBackToList();
-                                }
-                            }}
-                            className="relative bg-white dark:bg-[#0c0c0c] w-full max-w-xl rounded-t-[28px] border-t border-gray-100 dark:border-zinc-800/80 shadow-2xl overflow-hidden z-[100011] max-h-[92vh] flex flex-col"
-                            onClick={e => e.stopPropagation()}
-                        >
-                            {/* Drag Handle */}
-                            <div className="flex justify-center py-3.5 cursor-pointer" onClick={handleBackToList}>
-                                <div className="w-12 h-1 bg-gray-200 dark:bg-zinc-800 rounded-full hover:bg-gray-300 dark:hover:bg-zinc-700 transition-colors" />
-                            </div>
-
-                            <div className="overflow-y-auto w-full">
-                                {renderCreateForm()}
-                            </div>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
-
-            {/* Edit Task Bottom Sheet */}
-            <AnimatePresence>
-                {subPage === 'edit' && activeEditingTask && (
-                    <div className="fixed inset-0 z-[100010] flex items-end justify-center bg-black/40 backdrop-blur-xs" onClick={handleBackToList}>
-                        <motion.div 
-                            initial={{ y: '100%' }}
-                            animate={{ y: 0 }}
-                            exit={{ y: '100%' }}
-                            transition={{ type: 'spring', damping: 28, stiffness: 240 }}
-                            drag="y"
-                            dragConstraints={{ top: 0 }}
-                            dragElastic={{ top: 0.1, bottom: 0.8 }}
-                            onDragEnd={(e, info) => {
-                                if (info.velocity.y > 100 || info.offset.y > 150) {
-                                    handleBackToList();
-                                }
-                            }}
-                            className="relative bg-white dark:bg-[#0c0c0c] w-full max-w-xl rounded-t-[28px] border-t border-gray-100 dark:border-zinc-800/80 shadow-2xl overflow-hidden z-[100011] max-h-[92vh] flex flex-col"
-                            onClick={e => e.stopPropagation()}
-                        >
-                            {/* Drag Handle */}
-                            <div className="flex justify-center py-3.5 cursor-pointer" onClick={handleBackToList}>
-                                <div className="w-12 h-1 bg-gray-200 dark:bg-zinc-800 rounded-full hover:bg-gray-300 dark:hover:bg-zinc-700 transition-colors" />
-                            </div>
-
-                            <div className="overflow-y-auto w-full">
-                                {renderEditForm()}
-                            </div>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
+            {/* Mobile Task Drawer for Add & Edit */}
+            <MobileTaskDrawer 
+                isOpen={isDrawerOpen} 
+                onClose={handleCloseDrawer} 
+                onAddTask={onAddTodo}
+                onEditTask={(_, text, options) => {
+                    if (activeEditingTask && onUpdateTodo) {
+                         const updatedTask: Todo = { 
+                             ...activeEditingTask, 
+                             text, 
+                             ...options,
+                             end_date: options?.end_date !== undefined ? options.end_date : (options?.endDate !== undefined ? options.endDate : null)
+                         };
+                         onUpdateTodo(updatedTask);
+                    }
+                }}
+                taskToEdit={activeEditingTask}
+                projects={projects}
+            />
         </div>
     );
 };
