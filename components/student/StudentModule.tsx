@@ -9,6 +9,8 @@ import { AcademicAnalytics } from './AcademicAnalytics';
 import { computeGoalProgress } from './utils/goalProgress';
 import { calculateGradeSummary } from './utils/gradeCalculator';
 import { ChevronLeft, ChevronRight, Plus, X, Calendar, BookOpen, Target, BarChart2, CheckCircle2, Trash2, Clock, MapPin, Video, Check } from 'lucide-react';
+import { CreateSubjectFullScreen } from './CreateSubjectFullScreen';
+import { renderSubjectIcon } from './subjectIcons';
 
 interface StudentModuleProps {
   userName?: string;
@@ -442,22 +444,6 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
   };
   const [masSubScreen, setMasSubScreen] = useState<'calendar' | 'schedule' | 'library' | 'goals' | 'analytics' | null>(null);
 
-  // New Subject Form Extended State
-  const [newSubjectName, setNewSubjectName] = useState('');
-  const [newSubjectCode, setNewSubjectCode] = useState('');
-  const [newSubjectDescription, setNewSubjectDescription] = useState('');
-  const [newSubjectProfessor, setNewSubjectProfessor] = useState('');
-  const [newSubjectIsVirtual, setNewSubjectIsVirtual] = useState(false);
-  const [newSubjectRoom, setNewSubjectRoom] = useState('');
-  const [newSubjectDays, setNewSubjectDays] = useState<string[]>([]);
-  const [newSubjectStartTime, setNewSubjectStartTime] = useState('08:00');
-  const [newSubjectEndTime, setNewSubjectEndTime] = useState('10:00');
-  const [newSubjectHasDateRange, setNewSubjectHasDateRange] = useState(false);
-  const [newSubjectStartDate, setNewSubjectStartDate] = useState('');
-  const [newSubjectEndDate, setNewSubjectEndDate] = useState('');
-  const [newSubjectColor, setNewSubjectColor] = useState('#3B82F6');
-  const [newSubjectEmoji, setNewSubjectEmoji] = useState('📚');
-  
   // New Reading Form
   const [isAddingReading, setIsAddingReading] = useState(false);
   const [newReadingTitle, setNewReadingTitle] = useState('');
@@ -530,7 +516,7 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
           period_id: defaultPeriodId,
           name: 'Sistemas Estructurales II',
           color: '#0d9488',
-          emoji: '🔨',
+          icon_name: 'Hammer',
           days: ['Lunes', 'Jueves', 'Sábado'],
           start_time: '10:07',
           end_time: '12:07',
@@ -543,7 +529,7 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
           period_id: defaultPeriodId,
           name: 'Diseño de Interiores II',
           color: '#f43f5e',
-          emoji: '🏛️',
+          icon_name: 'Landmark',
           days: ['Lunes', 'Jueves', 'Viernes'],
           start_time: '12:00',
           end_time: '14:00',
@@ -556,7 +542,7 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
           period_id: defaultPeriodId,
           name: 'Taller de Proyectos IV',
           color: '#6366f1',
-          emoji: '📦',
+          icon_name: 'Box',
           days: ['Lunes', 'Miércoles', 'Viernes'],
           start_time: '07:00',
           end_time: '09:00',
@@ -569,7 +555,7 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
           period_id: defaultPeriodId,
           name: 'Teoría de la Arquitectura',
           color: '#0284c7',
-          emoji: '📊',
+          icon_name: 'PieChart',
           days: ['Martes', 'Jueves'],
           start_time: '08:00',
           end_time: '10:00',
@@ -694,55 +680,6 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
       console.error("Error saving goal:", err);
     }
     loadData();
-  };
-
-  const handleSaveSubject = async () => {
-    if (!newSubjectName.trim()) return;
-
-    let userId = 'local';
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user?.id) userId = user.id;
-    } catch {}
-
-    const newSubject: Subject = {
-      id: generateUUID(),
-      user_id: userId,
-      name: newSubjectName.trim(),
-      code: newSubjectCode.trim() || undefined,
-      description: newSubjectDescription.trim() || undefined,
-      professor: newSubjectProfessor.trim() || undefined,
-      is_virtual: newSubjectIsVirtual,
-      room: !newSubjectIsVirtual && newSubjectRoom.trim() ? newSubjectRoom.trim() : undefined,
-      has_date_range: newSubjectHasDateRange,
-      start_date: newSubjectHasDateRange && newSubjectStartDate ? newSubjectStartDate : undefined,
-      end_date: newSubjectHasDateRange && newSubjectEndDate ? newSubjectEndDate : undefined,
-      color: '#18181b',
-      emoji: newSubjectEmoji || '📚',
-      created_at: new Date().toISOString()
-    };
-    
-    // Optimistic update
-    setSubjects(prev => [newSubject, ...prev]);
-    setIsAddingSubject(false);
-    
-    // Reset form fields
-    setNewSubjectName('');
-    setNewSubjectCode('');
-    setNewSubjectDescription('');
-    setNewSubjectProfessor('');
-    setNewSubjectIsVirtual(false);
-    setNewSubjectRoom('');
-    setNewSubjectHasDateRange(false);
-    setNewSubjectStartDate('');
-    setNewSubjectEndDate('');
-    setNewSubjectEmoji('📚');
-    
-    try {
-      await syncableCreate('student_subjects', newSubject);
-    } catch (err) {
-      console.error("Error saving subject:", err);
-    }
   };
 
   const handleSaveScheduleSlot = async (slotData: {
@@ -1030,7 +967,7 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
                       <div key={subject.id} onClick={() => setActiveSubject(subject)} className="bg-white dark:bg-[#151515] rounded-3xl p-6 border border-gray-100 dark:border-white/5 shadow-sm hover:shadow-md hover:border-gray-200 dark:hover:border-white/10 transition-all cursor-pointer group relative">
                         <div className="flex items-start justify-between mb-6">
                           <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-white text-xl shadow-inner" style={{ backgroundColor: subject.color }}>
-                            <span>{subject.emoji || '📚'}</span>
+                            {renderSubjectIcon(subject.icon_name || subject.emoji, "w-6 h-6")}
                           </div>
                           <button 
                             onClick={(e) => handleDeleteSubject(e, subject.id)}
@@ -1111,7 +1048,7 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
                       <div key={exam.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-2xl bg-gray-50 dark:bg-[#111] border border-gray-100 dark:border-white/5 gap-4">
                         <div className="flex items-start gap-4">
                           <div className="w-12 h-12 rounded-xl flex items-center justify-center text-white text-xl shadow-inner flex-shrink-0" style={{ backgroundColor: subject?.color || '#9ca3af' }}>
-                            <span>{subject?.emoji || '📅'}</span>
+                            {renderSubjectIcon(subject?.icon_name || subject?.emoji, "w-6 h-6")}
                           </div>
                           <div>
                             <h4 className="font-semibold text-gray-900 dark:text-gray-100">{exam.title}</h4>
@@ -1426,7 +1363,7 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
             <>
               {/* RESUMEN TAB - REDISEÑO SEGÚN REFERENCIA */}
               {mobileTab === 'resumen' && (
-                <div className="space-y-6 -mx-4 -mt-4 px-4 pt-4 pb-12 bg-gradient-to-b from-[#f3efff] via-[#f7f4fe] to-transparent dark:from-[#191429] dark:via-[#110e1c] dark:to-transparent min-h-full">
+                <div className="space-y-6 -mx-4 -mt-4 px-4 pt-4 pb-12 bg-white dark:bg-[#0c0c0e] min-h-full">
                   
                   {/* HEADER: SEMESTRE Y SALUDO */}
                   {(() => {
@@ -1529,7 +1466,7 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
                         </div>
 
                         {todayItems.length === 0 ? (
-                          <div className="bg-white dark:bg-[#16141f] rounded-2xl p-5 border border-gray-150/70 dark:border-white/5 shadow-xs text-center">
+                          <div className="bg-gray-50 dark:bg-[#16141f] rounded-2xl p-5 border border-gray-150/70 dark:border-white/5 shadow-xs text-center">
                             <h4 className="text-xs font-bold text-gray-900 dark:text-white">Todo al día por hoy</h4>
                             <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
                               No tienes clases ni entregas pendientes para hoy.
@@ -1537,10 +1474,8 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
                           </div>
                         ) : (
                           <div className="space-y-3">
-                            {todayItems.map((item, idx) => {
+                            {todayItems.map((item) => {
                               const isDone = item.completed || completedTodayIds.has(item.id);
-                              // Default alternating check colors matching image: purple and mint/teal
-                              const checkBgColor = idx % 2 === 0 ? 'bg-[#7c5dfa]' : 'bg-[#4ed3a4]';
 
                               return (
                                 <div
@@ -1563,7 +1498,7 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
                                     </div>
                                   </div>
 
-                                  {/* Circular Check Button */}
+                                  {/* Circular Check Button: White when pending, Green when completed */}
                                   <button
                                     type="button"
                                     onClick={() => {
@@ -1580,12 +1515,14 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
                                         }
                                       }
                                     }}
-                                    className={`w-8 h-8 rounded-full flex items-center justify-center text-white shrink-0 shadow-xs active:scale-90 transition-transform cursor-pointer ${
-                                      isDone ? 'bg-[#10b981]' : checkBgColor
+                                    className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 active:scale-90 transition-all cursor-pointer ${
+                                      isDone
+                                        ? 'bg-[#10b981] border-2 border-[#10b981] text-white shadow-xs'
+                                        : 'bg-white dark:bg-[#18181b] border-2 border-gray-300 dark:border-zinc-600 text-transparent hover:border-emerald-500 shadow-2xs'
                                     }`}
-                                    title="Marcar completada / asistida"
+                                    title={isDone ? "Completada (toca para desmarcar)" : "Marcar completada"}
                                   >
-                                    <Check className="w-4 h-4 stroke-[3]" />
+                                    <Check className={`w-4 h-4 stroke-[3] transition-opacity ${isDone ? 'opacity-100' : 'opacity-0'}`} />
                                   </button>
                                 </div>
                               );
@@ -1600,12 +1537,12 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
                   {(() => {
                     // Predefined pastel palette sequence
                     const palettes = [
-                      { color: '#0d9488', bg: '#d8f8f2', darkBg: '#0f3a35', darkColor: '#2dd4bf', defaultIcon: '🔨' },
-                      { color: '#f43f5e', bg: '#ffe2e5', darkBg: '#3f121d', darkColor: '#fb7185', defaultIcon: '🏛️' },
-                      { color: '#6366f1', bg: '#e6e2ff', darkBg: '#1f1b40', darkColor: '#818cf8', defaultIcon: '📦' },
-                      { color: '#0284c7', bg: '#dff3ff', darkBg: '#0c2d48', darkColor: '#38bdf8', defaultIcon: '📊' },
-                      { color: '#d97706', bg: '#fef3c7', darkBg: '#3d2406', darkColor: '#fbbf24', defaultIcon: '💡' },
-                      { color: '#059669', bg: '#d1fae5', darkBg: '#063a28', darkColor: '#34d399', defaultIcon: '🌿' },
+                      { color: '#0d9488', bg: '#d8f8f2', darkBg: '#0f3a35', darkColor: '#2dd4bf', defaultIcon: 'Hammer' },
+                      { color: '#f43f5e', bg: '#ffe2e5', darkBg: '#3f121d', darkColor: '#fb7185', defaultIcon: 'Landmark' },
+                      { color: '#6366f1', bg: '#e6e2ff', darkBg: '#1f1b40', darkColor: '#818cf8', defaultIcon: 'Box' },
+                      { color: '#0284c7', bg: '#dff3ff', darkBg: '#0c2d48', darkColor: '#38bdf8', defaultIcon: 'PieChart' },
+                      { color: '#d97706', bg: '#fef3c7', darkBg: '#3d2406', darkColor: '#fbbf24', defaultIcon: 'Lightbulb' },
+                      { color: '#059669', bg: '#d1fae5', darkBg: '#063a28', darkColor: '#34d399', defaultIcon: 'GraduationCap' },
                     ];
 
                     const daysShortMap: Record<string, string> = {
@@ -1652,7 +1589,7 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
                         {subjects.length === 0 ? (
                           <div
                             onClick={() => setIsAddingSubject(true)}
-                            className="p-6 border-2 border-dashed border-gray-200 dark:border-white/10 rounded-2xl text-center cursor-pointer bg-white/60 dark:bg-[#16141f]/60 hover:border-blue-500 transition-colors"
+                            className="p-6 border-2 border-dashed border-gray-200 dark:border-white/10 rounded-2xl text-center cursor-pointer bg-white dark:bg-[#16141f] hover:border-blue-500 transition-colors"
                           >
                             <p className="text-xs font-semibold text-gray-800 dark:text-gray-200">Aún no tienes materias</p>
                             <p className="text-[11px] text-gray-500 mt-0.5">Toca aquí para crear tu primera materia.</p>
@@ -1680,7 +1617,7 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
                                         color: accentColor
                                       }}
                                     >
-                                      {subject.emoji || palette.defaultIcon}
+                                      {renderSubjectIcon(subject.icon_name || subject.emoji, "w-4 h-4")}
                                     </div>
                                     <div className="w-6 h-6 rounded-full bg-gray-100 dark:bg-white/10 text-gray-400 dark:text-gray-300 flex items-center justify-center shrink-0">
                                       <ChevronRight className="w-3.5 h-3.5" />
@@ -1755,8 +1692,14 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
                             className="p-3.5 bg-white dark:bg-[#151515] rounded-2xl border border-gray-150 dark:border-white/5 flex items-center justify-between cursor-pointer active:scale-[0.99] transition-transform"
                           >
                             <div className="flex items-center gap-3 min-w-0 pr-2">
-                              <div className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white flex items-center justify-center text-base shrink-0 border border-gray-200 dark:border-white/10">
-                                {subject.emoji || '📚'}
+                              <div 
+                                className="w-10 h-10 rounded-xl flex items-center justify-center text-base shrink-0 border border-gray-150/80 dark:border-white/10"
+                                style={{
+                                  backgroundColor: `${subject.color || '#0d9488'}18`,
+                                  color: subject.color || '#0d9488'
+                                }}
+                              >
+                                {renderSubjectIcon(subject.icon_name || subject.emoji, "w-5 h-5")}
                               </div>
                               <div className="min-w-0">
                                 <h4 className="font-bold text-xs text-gray-900 dark:text-white truncate">{subject.name}</h4>
@@ -1894,219 +1837,56 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
     )}
   </div>
       
-      {/* Add Subject Bottom Sheet */}
-      <AnimatePresence>
-        {isAddingSubject && (
-          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs p-0 sm:p-4">
-            <motion.div 
-              initial={{ y: "100%", opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: "100%", opacity: 0 }}
-              transition={{ type: "spring", damping: 28, stiffness: 300 }}
-              className="relative w-full max-w-lg bg-white dark:bg-[#18181b] rounded-t-3xl sm:rounded-2xl border-t sm:border border-gray-200 dark:border-white/10 p-5 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto shadow-2xl pb-safe"
-            >
-              <div className="w-12 h-1 bg-gray-300 dark:bg-white/20 rounded-full mx-auto my-1 shrink-0 sm:hidden" />
-              <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-white/10">
-                <div>
-                  <h3 className="text-base font-bold text-gray-900 dark:text-white">Nueva Materia</h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Registra los detalles y horario de tu asignatura</p>
-                </div>
-                <button onClick={() => setIsAddingSubject(false)} className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg transition-colors cursor-pointer">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
+      {/* CREATE SUBJECT FULL SCREEN */}
+      <CreateSubjectFullScreen
+        isOpen={isAddingSubject}
+        onClose={() => setIsAddingSubject(false)}
+        onSave={async (subjectData) => {
+          let userId = 'local';
+          try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user?.id) userId = user.id;
+          } catch {}
 
-              <div className="space-y-4">
-                {/* Campos ordenados en columnas de a 2 */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* Columna 1: Nombre */}
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">Nombre *</label>
-                    <input 
-                      type="text" 
-                      value={newSubjectName} 
-                      onChange={e => setNewSubjectName(e.target.value)} 
-                      className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white text-sm" 
-                      placeholder="Ej: Matemáticas Discretas" 
-                      autoFocus 
-                    />
-                  </div>
+          const newSubj: Subject = {
+            id: generateUUID(),
+            user_id: userId,
+            name: subjectData.name,
+            code: subjectData.code,
+            professor: subjectData.professor,
+            room: subjectData.room,
+            color: subjectData.color,
+            icon_name: subjectData.icon_name,
+            days: subjectData.days,
+            start_time: subjectData.start_time,
+            end_time: subjectData.end_time,
+            created_at: new Date().toISOString()
+          };
 
-                  {/* Columna 2: Código */}
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">Código</label>
-                    <input 
-                      type="text" 
-                      value={newSubjectCode} 
-                      onChange={e => setNewSubjectCode(e.target.value)} 
-                      className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white text-sm font-mono" 
-                      placeholder="MAT-101" 
-                    />
-                  </div>
+          const newScheds: SubjectSchedule[] = (subjectData.days || []).map(d => ({
+            id: `sched-${newSubj.id}-${d}`,
+            user_id: userId,
+            subject_id: newSubj.id,
+            day_of_week: d,
+            start_time: subjectData.start_time || '08:00',
+            end_time: subjectData.end_time || '10:00',
+            repeat_weekly: true
+          }));
 
-                  {/* Columna 3: Profesor */}
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">Profesor</label>
-                    <input 
-                      type="text" 
-                      value={newSubjectProfessor} 
-                      onChange={e => setNewSubjectProfessor(e.target.value)} 
-                      className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white text-sm" 
-                      placeholder="Ej: Dr. Carlos Pérez" 
-                    />
-                  </div>
+          setSubjects(prev => [newSubj, ...prev]);
+          setSchedules(prev => [...prev, ...newScheds]);
+          setIsAddingSubject(false);
 
-                  {/* Columna 4: Emoji de la Materia */}
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">Emoji / Icono</label>
-                    <div className="flex items-center gap-2">
-                      <span className="text-2xl p-2 bg-gray-100 dark:bg-white/10 rounded-xl shrink-0">
-                        {newSubjectEmoji || '📚'}
-                      </span>
-                      <input 
-                        type="text" 
-                        value={newSubjectEmoji} 
-                        onChange={e => setNewSubjectEmoji(e.target.value)} 
-                        className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none text-sm text-center" 
-                        placeholder="Escribe emoji..." 
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Selección rápida de Emojis */}
-                <div>
-                  <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Elegir de lista rápida de emojis</label>
-                  <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-2 bg-gray-50 dark:bg-[#111] rounded-xl border border-gray-150 dark:border-white/5">
-                    {['📚', '📖', '✏️', '📝', '📐', '🧪', '🔬', '💻', '🎨', '🏛️', '🧬', '⚖️', '🩺', '📊', '🌍', '🧠', '🎼', '🗣️', '⚽', '💼', '🤖', '🎓', '🎒', '🖋️', '📌', '🔎', '💡', '🧮', '🛰️', '⭐'].map(emoji => (
-                      <button
-                        key={emoji}
-                        type="button"
-                        onClick={() => setNewSubjectEmoji(emoji)}
-                        className={`w-8 h-8 rounded-lg text-base flex items-center justify-center transition-transform hover:scale-115 cursor-pointer ${
-                          newSubjectEmoji === emoji ? 'bg-black text-white dark:bg-white dark:text-black scale-110 shadow-xs' : 'hover:bg-gray-200 dark:hover:bg-white/10'
-                        }`}
-                      >
-                        {emoji}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Descripción (2 columnas ancho completo) */}
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">Descripción</label>
-                  <textarea 
-                    value={newSubjectDescription} 
-                    onChange={e => setNewSubjectDescription(e.target.value)} 
-                    rows={2}
-                    className="w-full px-3.5 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white text-sm resize-none" 
-                    placeholder="Breve resumen o temas principales de la asignatura..." 
-                  />
-                </div>
-
-                {/* Modalidad & Aula */}
-                <div className="pt-2 border-t border-gray-100 dark:border-white/5 grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">Modalidad</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setNewSubjectIsVirtual(false)}
-                        className={`py-2 px-2.5 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                          !newSubjectIsVirtual 
-                            ? 'bg-black text-white dark:bg-white dark:text-black border-transparent shadow-xs' 
-                            : 'bg-gray-50 dark:bg-[#111] text-gray-700 dark:text-gray-300 border-gray-200 dark:border-white/10'
-                        }`}
-                      >
-                        <MapPin className="w-3.5 h-3.5" />
-                        <span>Presencial</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setNewSubjectIsVirtual(true)}
-                        className={`py-2 px-2.5 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                          newSubjectIsVirtual 
-                            ? 'bg-black text-white dark:bg-white dark:text-black border-transparent shadow-xs' 
-                            : 'bg-gray-50 dark:bg-[#111] text-gray-700 dark:text-gray-300 border-gray-200 dark:border-white/10'
-                        }`}
-                      >
-                        <Video className="w-3.5 h-3.5" />
-                        <span>Virtual</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    {!newSubjectIsVirtual ? (
-                      <>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">
-                          Aula / Salón de Clase
-                        </label>
-                        <input 
-                          type="text" 
-                          value={newSubjectRoom} 
-                          onChange={e => setNewSubjectRoom(e.target.value)} 
-                          className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white text-sm" 
-                          placeholder="Ej: Edificio A - Aula 302" 
-                        />
-                      </>
-                    ) : (
-                      <div className="p-2.5 bg-purple-50 dark:bg-purple-950/20 rounded-xl border border-purple-200 dark:border-purple-500/20 text-xs text-purple-700 dark:text-purple-300 flex items-center gap-2">
-                        <Video className="w-4 h-4 shrink-0" />
-                        <span>Modalidad Virtual activada (sin aula física).</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Fechas opcionales de inicio y fin */}
-                <div className="pt-2 border-t border-gray-100 dark:border-white/5 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 cursor-pointer" onClick={() => setNewSubjectHasDateRange(!newSubjectHasDateRange)}>
-                      ¿Definir fecha de inicio o fin? (Opcional)
-                    </label>
-                    <input 
-                      type="checkbox" 
-                      checked={newSubjectHasDateRange} 
-                      onChange={e => setNewSubjectHasDateRange(e.target.checked)} 
-                      className="w-4 h-4 rounded text-black dark:text-white cursor-pointer" 
-                    />
-                  </div>
-
-                  {newSubjectHasDateRange && (
-                    <div className="grid grid-cols-2 gap-3 pt-1">
-                      <div>
-                        <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-400 mb-1">Fecha Inicio</label>
-                        <input 
-                          type="date" 
-                          value={newSubjectStartDate} 
-                          onChange={e => setNewSubjectStartDate(e.target.value)} 
-                          className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none text-xs" 
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-400 mb-1">Fecha Finalización</label>
-                        <input 
-                          type="date" 
-                          value={newSubjectEndDate} 
-                          onChange={e => setNewSubjectEndDate(e.target.value)} 
-                          className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none text-xs" 
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="pt-3 border-t border-gray-100 dark:border-white/10 flex justify-end gap-3">
-                <button onClick={() => setIsAddingSubject(false)} className="px-4 py-2.5 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 rounded-xl transition-colors cursor-pointer">Cancelar</button>
-                <button onClick={handleSaveSubject} disabled={!newSubjectName.trim()} className="px-5 py-2.5 text-xs font-bold bg-black text-white dark:bg-white dark:text-black rounded-xl hover:bg-gray-800 dark:hover:bg-gray-200 disabled:opacity-50 transition-colors cursor-pointer">Guardar Materia</button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+          try {
+            await syncableCreate('student_subjects', newSubj);
+            for (const sc of newScheds) {
+              await syncableCreate('student_subject_schedules', sc);
+            }
+          } catch (err) {
+            console.error("Error saving subject:", err);
+          }
+        }}
+      />
 
       {/* Add Reading Bottom Sheet */}
       <AnimatePresence>

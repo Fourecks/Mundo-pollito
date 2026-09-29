@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { syncableCreate, syncableUpdate, syncableDelete, getAll, ensureDB } from '../../db';
 import { supabase } from '../../supabaseClient';
 import { calculateGradeSummary } from './utils/gradeCalculator';
+import { renderSubjectIcon } from './subjectIcons';
 import { 
   ChevronLeft, ChevronRight, Plus, X, FileText, CheckSquare, Calendar, 
   Paperclip, Award, BookOpen, Clock, Trash2, CheckCircle2, Circle, Sparkles,
@@ -827,8 +828,17 @@ export const SubjectWorkspace: React.FC<Props> = ({
                 <ChevronLeft className="w-4 h-4" />
                 <span>Atrás</span>
               </button>
+              <div 
+                className="w-9 h-9 rounded-xl flex items-center justify-center text-sm shrink-0 border border-gray-150/80 dark:border-white/10"
+                style={{
+                  backgroundColor: `${subject.color || '#0d9488'}18`,
+                  color: subject.color || '#0d9488'
+                }}
+              >
+                {renderSubjectIcon(subject.icon_name || subject.emoji, "w-4 h-4")}
+              </div>
               <div className="min-w-0">
-                <h2 className="text-lg font-bold tracking-tight text-gray-900 dark:text-white truncate">{subject.name}</h2>
+                <h2 className="text-base sm:text-lg font-bold tracking-tight text-gray-900 dark:text-white truncate">{subject.name}</h2>
                 {subject.professor && (
                   <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{subject.professor}</p>
                 )}

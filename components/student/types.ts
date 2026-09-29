@@ -17,6 +17,7 @@ export interface Subject {
   professor?: string;
   room?: string;
   color: string; // Hex color e.g., "#3B82F6"
+  icon_name?: string;
   emoji?: string;
   description?: string;
   target_grade?: number;
