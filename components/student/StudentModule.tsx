@@ -69,23 +69,49 @@ const ScheduleView: React.FC<{
     setIsAddingSlot(false);
   };
 
-  const daySlots = schedules.filter(s => s.day_of_week === selectedDay)
+  const daySlots = schedules
+    .filter(s => s.day_of_week === selectedDay)
     .sort((a, b) => (a.start_time || '00:00').localeCompare(b.start_time || '00:00'));
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <Clock className="w-5 h-5 text-gray-700 dark:text-gray-300" />
-            <span>Horario de Clases Semanal</span>
+    <div className="space-y-4">
+      {/* Header Minimalista */}
+      <div className="flex items-center justify-between gap-2 pb-2 border-b border-gray-100 dark:border-white/5">
+        <div className="flex items-center gap-2">
+          <h3 className="text-base font-bold text-gray-900 dark:text-white tracking-tight">
+            Horario
           </h3>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-            Agrega clases de tus materias creadas y organízalas por día
-          </p>
+          <span className="text-xs font-medium text-gray-400">
+            · {schedules.length} {schedules.length === 1 ? 'clase' : 'clases'}
+          </span>
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Selector de Vista Día / Semana */}
+          <div className="flex items-center p-0.5 bg-gray-100 dark:bg-white/5 rounded-lg text-[11px] font-medium">
+            <button
+              onClick={() => setViewMode('day')}
+              className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+                viewMode === 'day'
+                  ? 'bg-white dark:bg-[#222] text-gray-900 dark:text-white shadow-2xs font-semibold'
+                  : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+              }`}
+            >
+              Día
+            </button>
+            <button
+              onClick={() => setViewMode('week')}
+              className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+                viewMode === 'week'
+                  ? 'bg-white dark:bg-[#222] text-gray-900 dark:text-white shadow-2xs font-semibold'
+                  : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+              }`}
+            >
+              Semana
+            </button>
+          </div>
+
+          {/* Botón Añadir Clase */}
           <button
             onClick={() => {
               if (subjects.length === 0) {
@@ -95,39 +121,17 @@ const ScheduleView: React.FC<{
                 setIsAddingSlot(true);
               }
             }}
-            className="px-3.5 py-1.5 bg-black text-white dark:bg-white dark:text-black rounded-xl text-xs font-bold flex items-center gap-1.5 hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+            className="px-3 py-1 bg-black text-white dark:bg-white dark:text-black rounded-lg text-xs font-semibold flex items-center gap-1 hover:opacity-90 active:scale-95 transition-all cursor-pointer"
           >
-            <Plus className="w-4 h-4" />
-            <span>+ Añadir a Horario</span>
+            <Plus className="w-3.5 h-3.5" />
+            <span>Añadir</span>
           </button>
-
-          <div className="flex items-center gap-1 bg-gray-100 dark:bg-white/10 p-1 rounded-xl">
-            <button
-              onClick={() => setViewMode('day')}
-              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
-                viewMode === 'day' 
-                  ? 'bg-white dark:bg-[#18181b] text-gray-900 dark:text-white shadow-xs' 
-                  : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
-              }`}
-            >
-              Día
-            </button>
-            <button
-              onClick={() => setViewMode('week')}
-              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
-                viewMode === 'week' 
-                  ? 'bg-white dark:bg-[#18181b] text-gray-900 dark:text-white shadow-xs' 
-                  : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
-              }`}
-            >
-              Semana
-            </button>
-          </div>
         </div>
       </div>
 
+      {/* Selector de Día */}
       {viewMode === 'day' && (
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+        <div className="flex items-center gap-1.5 overflow-x-auto py-1 no-scrollbar">
           {daysOfWeek.map((day) => {
             const hasClasses = schedules.some(s => s.day_of_week === day);
             const isSelected = selectedDay === day;
@@ -135,15 +139,15 @@ const ScheduleView: React.FC<{
               <button
                 key={day}
                 onClick={() => setSelectedDay(day)}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
                   isSelected
-                    ? 'bg-black text-white dark:bg-white dark:text-black shadow-sm'
-                    : 'bg-white dark:bg-[#151515] text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20'
+                    ? 'bg-black text-white dark:bg-white dark:text-black font-semibold'
+                    : 'bg-gray-50 dark:bg-[#18181b] text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#222]'
                 }`}
               >
                 <span>{day.substring(0, 3)}</span>
                 {hasClasses && (
-                  <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white dark:bg-black' : 'bg-blue-500'}`} />
+                  <span className={`w-1 h-1 rounded-full ${isSelected ? 'bg-white dark:bg-black' : 'bg-blue-500'}`} />
                 )}
               </button>
             );
@@ -151,19 +155,12 @@ const ScheduleView: React.FC<{
         </div>
       )}
 
+      {/* Lista de Clases del Día */}
       {viewMode === 'day' && (
-        <div className="space-y-3">
+        <div className="space-y-2 pt-1">
           {daySlots.length === 0 ? (
-            <div className="p-8 bg-white dark:bg-[#151515] border border-gray-150 dark:border-white/5 rounded-2xl text-center space-y-3">
-              <Clock className="w-8 h-8 text-gray-300 dark:text-gray-600 mx-auto" />
-              <div>
-                <p className="text-sm font-bold text-gray-800 dark:text-gray-200">Sin horario de clases para el {selectedDay}</p>
-                <p className="text-xs text-gray-400 mt-1">
-                  {subjects.length === 0 
-                    ? 'Primero crea una materia para poder agregarla a tu horario.' 
-                    : 'Toca "+ Añadir a Horario" para programar una materia en este día.'}
-                </p>
-              </div>
+            <div className="py-10 text-center space-y-2 rounded-2xl bg-gray-50/50 dark:bg-[#151515]/50 border border-dashed border-gray-200 dark:border-white/5">
+              <p className="text-xs text-gray-400 font-medium">Sin clases programadas para el {selectedDay.toLowerCase()}</p>
               <button
                 onClick={() => {
                   if (subjects.length === 0) {
@@ -173,10 +170,9 @@ const ScheduleView: React.FC<{
                     setIsAddingSlot(true);
                   }
                 }}
-                className="px-4 py-2 bg-black dark:bg-white text-white dark:text-black text-xs font-bold rounded-xl inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+                className="text-xs font-semibold text-gray-900 dark:text-white underline hover:opacity-80 transition-opacity cursor-pointer"
               >
-                <Plus className="w-4 h-4" />
-                <span>{subjects.length === 0 ? '+ Crear Materia' : '+ Añadir a Horario'}</span>
+                {subjects.length === 0 ? '+ Crear una materia' : '+ Programar clase'}
               </button>
             </div>
           ) : (
@@ -186,65 +182,40 @@ const ScheduleView: React.FC<{
               return (
                 <div
                   key={slot.id}
-                  className="p-4 bg-white dark:bg-[#151515] rounded-2xl border border-gray-150 dark:border-white/5 hover:border-gray-300 dark:hover:border-white/20 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 group"
+                  className="group px-3.5 py-3 bg-white dark:bg-[#151515] rounded-xl border border-gray-150 dark:border-white/5 hover:border-gray-300 dark:hover:border-white/20 transition-all flex items-center justify-between gap-3"
                 >
                   <div 
                     onClick={() => onSelectSubject(subj)}
-                    className="flex items-start gap-3.5 cursor-pointer min-w-0"
+                    className="flex items-center gap-3 cursor-pointer min-w-0 flex-1"
                   >
-                    <div className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-white/10 flex items-center justify-center text-xl shrink-0 font-bold">
-                      {subj.emoji || '📚'}
+                    <div className="text-xs font-mono font-medium text-gray-500 dark:text-gray-400 shrink-0 w-24">
+                      {slot.start_time || '08:00'} - {slot.end_time || '10:00'}
                     </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h4 className="font-bold text-sm text-gray-900 dark:text-white group-hover:text-blue-500 transition-colors truncate">
-                          {subj.name}
-                        </h4>
-                        {subj.code && (
-                          <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-gray-100 dark:bg-white/10 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-white/10">
-                            {subj.code}
-                          </span>
-                        )}
-                      </div>
-                      {subj.professor && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                          Profesor: {subj.professor}
-                        </p>
-                      )}
-                      <div className="flex items-center gap-2 mt-2 text-xs font-semibold text-gray-600 dark:text-gray-300 flex-wrap">
-                        {subj.is_virtual ? (
-                          <span className="flex items-center gap-1 text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/10 px-2 py-0.5 rounded-lg border border-purple-200 dark:border-purple-500/20">
-                            <Video className="w-3.5 h-3.5" />
-                            <span>Modalidad Virtual</span>
-                          </span>
-                        ) : (
-                          <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-200 dark:border-emerald-500/20">
-                            <MapPin className="w-3.5 h-3.5" />
-                            <span>{subj.room || 'Aula Presencial'}</span>
-                          </span>
-                        )}
-                        {slot.repeat_weekly && (
-                          <span className="text-[10px] text-gray-400 font-mono bg-gray-100 dark:bg-white/5 px-2 py-0.5 rounded">
-                            ↻ Repetición semanal
-                          </span>
-                        )}
-                      </div>
+
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-base shrink-0">{subj.emoji || '📚'}</span>
+                      <span className="font-semibold text-xs text-gray-900 dark:text-white truncate group-hover:text-blue-500 transition-colors">
+                        {subj.name}
+                      </span>
+                      {subj.is_virtual ? (
+                        <span className="text-[10px] text-purple-500 bg-purple-500/10 px-1.5 py-0.5 rounded font-medium shrink-0">
+                          Virtual
+                        </span>
+                      ) : subj.room ? (
+                        <span className="text-[10px] text-gray-500 bg-gray-100 dark:bg-white/5 px-1.5 py-0.5 rounded font-medium shrink-0 truncate max-w-[80px]">
+                          {subj.room}
+                        </span>
+                      ) : null}
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100 dark:border-white/5">
-                    <div className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white font-mono text-xs font-bold flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-gray-400" />
-                      <span>{slot.start_time || '08:00'} - {slot.end_time || '10:00'}</span>
-                    </div>
-                    <button
-                      onClick={() => onDeleteScheduleSlot(slot.id)}
-                      className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg transition-colors cursor-pointer"
-                      title="Eliminar de horario"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => onDeleteScheduleSlot(slot.id)}
+                    className="p-1 text-gray-300 hover:text-red-500 rounded transition-colors cursor-pointer shrink-0 opacity-80 sm:opacity-0 group-hover:opacity-100"
+                    title="Eliminar"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               );
             })
@@ -252,53 +223,56 @@ const ScheduleView: React.FC<{
         </div>
       )}
 
+      {/* Grid Semanal Minimalista */}
       {viewMode === 'week' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-2">
           {daysOfWeek.map((day) => {
-            const daySlotsList = schedules.filter(s => s.day_of_week === day)
+            const daySlotsList = schedules
+              .filter(s => s.day_of_week === day)
               .sort((a, b) => (a.start_time || '00:00').localeCompare(b.start_time || '00:00'));
 
             return (
               <div 
                 key={day} 
-                className="bg-white dark:bg-[#151515] p-4 rounded-2xl border border-gray-150 dark:border-white/5 space-y-3"
+                className="bg-white dark:bg-[#151515] p-2.5 rounded-xl border border-gray-150 dark:border-white/5 space-y-2 min-h-[100px]"
               >
-                <div className="flex items-center justify-between pb-2 border-b border-gray-100 dark:border-white/5">
-                  <h4 className="font-bold text-xs uppercase tracking-wider text-gray-800 dark:text-gray-200">{day}</h4>
-                  <span className="text-[10px] font-mono text-gray-400">
-                    {daySlotsList.length} {daySlotsList.length === 1 ? 'clase' : 'clases'}
+                <div className="flex items-center justify-between pb-1.5 border-b border-gray-100 dark:border-white/5">
+                  <span className="font-semibold text-[11px] uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                    {day.substring(0, 3)}
+                  </span>
+                  <span className="text-[10px] text-gray-400">
+                    {daySlotsList.length}
                   </span>
                 </div>
 
                 {daySlotsList.length === 0 ? (
-                  <p className="text-xs text-gray-400 py-3 text-center italic">Sin clases</p>
+                  <p className="text-[10px] text-gray-300 dark:text-gray-600 italic text-center py-2">—</p>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     {daySlotsList.map(slot => {
                       const subj = subjects.find(s => s.id === slot.subject_id);
                       if (!subj) return null;
                       return (
                         <div
                           key={slot.id}
-                          className="p-2.5 bg-gray-50 dark:bg-[#1a1a1e] rounded-xl border border-gray-200/80 dark:border-white/5 hover:border-gray-300 dark:hover:border-white/20 transition-all flex items-center justify-between gap-2"
+                          className="p-1.5 bg-gray-50 dark:bg-[#1c1c20] rounded-lg border border-gray-100 dark:border-white/5 group flex items-center justify-between gap-1 text-[11px]"
                         >
                           <div 
                             onClick={() => onSelectSubject(subj)}
                             className="min-w-0 cursor-pointer flex-1"
                           >
-                            <span className="font-bold text-xs text-gray-900 dark:text-white truncate block">
+                            <p className="font-semibold text-gray-900 dark:text-white truncate">
                               {subj.emoji} {subj.name}
-                            </span>
-                            <span className="text-[10px] text-gray-500 font-mono block mt-0.5">
-                              {slot.start_time} - {slot.end_time} · {subj.is_virtual ? 'Virtual' : (subj.room || 'Aula')}
-                            </span>
+                            </p>
+                            <p className="text-[9px] font-mono text-gray-400">
+                              {slot.start_time} - {slot.end_time}
+                            </p>
                           </div>
                           <button
                             onClick={() => onDeleteScheduleSlot(slot.id)}
-                            className="p-1 text-gray-400 hover:text-red-500 rounded-lg transition-colors cursor-pointer shrink-0"
-                            title="Eliminar"
+                            className="text-gray-300 hover:text-red-500 p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-3 h-3" />
                           </button>
                         </div>
                       );
@@ -311,41 +285,36 @@ const ScheduleView: React.FC<{
         </div>
       )}
 
-      {/* Add Schedule Slot Modal */}
+      {/* Modal para Añadir Clase */}
       <AnimatePresence>
         {isAddingSlot && (
-          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs p-0 sm:p-4">
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-xs p-0 sm:p-4">
             <motion.div 
               initial={{ y: "100%", opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: "100%", opacity: 0 }}
               transition={{ type: "spring", damping: 28, stiffness: 300 }}
-              className="relative w-full max-w-md bg-white dark:bg-[#18181b] rounded-t-3xl sm:rounded-2xl border-t sm:border border-gray-200 dark:border-white/10 p-5 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto shadow-2xl pb-safe"
+              className="relative w-full max-w-sm bg-white dark:bg-[#18181b] rounded-t-2xl sm:rounded-2xl border-t sm:border border-gray-200 dark:border-white/10 p-5 space-y-4 shadow-2xl pb-safe"
             >
-              <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-white/10">
-                <div>
-                  <h3 className="text-base font-bold text-gray-900 dark:text-white">Añadir a Horario</h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Asigna un horario semanal a una de tus materias</p>
-                </div>
-                <button onClick={() => setIsAddingSlot(false)} className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg transition-colors cursor-pointer">
-                  <X className="w-5 h-5" />
+              <div className="flex items-center justify-between pb-2 border-b border-gray-100 dark:border-white/10">
+                <h3 className="text-sm font-bold text-gray-900 dark:text-white">Añadir a Horario</h3>
+                <button onClick={() => setIsAddingSlot(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 cursor-pointer">
+                  <X className="w-4 h-4" />
                 </button>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {/* Seleccionar Materia */}
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">
-                    Seleccionar Materia *
-                  </label>
+                  <label className="block text-[11px] font-medium text-gray-500 dark:text-gray-400 mb-1">Materia</label>
                   <select
                     value={selectedSubjectId}
                     onChange={e => setSelectedSubjectId(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none text-sm font-medium"
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none text-xs font-medium"
                   >
                     {subjects.map(s => (
                       <option key={s.id} value={s.id}>
-                        {s.emoji || '📚'} {s.name} {s.code ? `(${s.code})` : ''}
+                        {s.emoji || '📚'} {s.name}
                       </option>
                     ))}
                   </select>
@@ -353,19 +322,17 @@ const ScheduleView: React.FC<{
 
                 {/* Día de la semana */}
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">
-                    Día de la semana *
-                  </label>
-                  <div className="flex flex-wrap gap-1.5">
+                  <label className="block text-[11px] font-medium text-gray-500 dark:text-gray-400 mb-1">Día</label>
+                  <div className="flex flex-wrap gap-1">
                     {daysOfWeek.map(d => (
                       <button
                         key={d}
                         type="button"
                         onClick={() => setSlotDay(d)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                           slotDay === d
-                            ? 'bg-black text-white dark:bg-white dark:text-black shadow-2xs'
-                            : 'bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-gray-300'
+                            ? 'bg-black text-white dark:bg-white dark:text-black font-semibold'
+                            : 'bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-400'
                         }`}
                       >
                         {d.substring(0, 3)}
@@ -375,49 +342,45 @@ const ScheduleView: React.FC<{
                 </div>
 
                 {/* Horas */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">Hora Inicio</label>
+                    <label className="block text-[11px] font-medium text-gray-500 dark:text-gray-400 mb-1">Inicio</label>
                     <input 
                       type="time" 
                       value={slotStartTime} 
                       onChange={e => setSlotStartTime(e.target.value)} 
-                      className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none text-xs font-mono" 
+                      className="w-full px-2.5 py-1.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none text-xs font-mono" 
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">Hora Fin</label>
+                    <label className="block text-[11px] font-medium text-gray-500 dark:text-gray-400 mb-1">Fin</label>
                     <input 
                       type="time" 
                       value={slotEndTime} 
                       onChange={e => setSlotEndTime(e.target.value)} 
-                      className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none text-xs font-mono" 
+                      className="w-full px-2.5 py-1.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none text-xs font-mono" 
                     />
                   </div>
                 </div>
 
                 {/* Repetición semanal */}
-                <div className="pt-2 border-t border-gray-100 dark:border-white/5 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 cursor-pointer" onClick={() => setSlotRepeatWeekly(!slotRepeatWeekly)}>
-                      Repetir semanalmente
-                    </label>
-                    <input 
-                      type="checkbox" 
-                      checked={slotRepeatWeekly} 
-                      onChange={e => setSlotRepeatWeekly(e.target.checked)} 
-                      className="w-4 h-4 rounded text-black dark:text-white cursor-pointer" 
-                    />
-                  </div>
-                  <p className="text-[11px] text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-white/5 p-2.5 rounded-xl border border-gray-150 dark:border-white/5 leading-relaxed">
-                    💡 Se cargará dinámicamente 1 mes por adelantado cada semana para mantener el rendimiento del dispositivo ligero y veloz.
-                  </p>
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-xs text-gray-600 dark:text-gray-300 font-medium">Repetir semanalmente</span>
+                  <input 
+                    type="checkbox" 
+                    checked={slotRepeatWeekly} 
+                    onChange={e => setSlotRepeatWeekly(e.target.checked)} 
+                    className="w-4 h-4 rounded text-black dark:text-white cursor-pointer" 
+                  />
                 </div>
-              </div>
 
-              <div className="pt-3 border-t border-gray-100 dark:border-white/10 flex justify-end gap-3">
-                <button onClick={() => setIsAddingSlot(false)} className="px-4 py-2.5 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 rounded-xl transition-colors cursor-pointer">Cancelar</button>
-                <button onClick={handleCreateSlot} disabled={!selectedSubjectId} className="px-5 py-2.5 text-xs font-bold bg-black text-white dark:bg-white dark:text-black rounded-xl hover:bg-gray-800 dark:hover:bg-gray-200 disabled:opacity-50 transition-colors cursor-pointer">Guardar en Horario</button>
+                <button
+                  type="button"
+                  onClick={handleCreateSlot}
+                  className="w-full py-2.5 bg-black text-white dark:bg-white dark:text-black rounded-xl text-xs font-semibold hover:opacity-90 active:scale-[0.99] transition-all cursor-pointer mt-2"
+                >
+                  Guardar en Horario
+                </button>
               </div>
             </motion.div>
           </div>
