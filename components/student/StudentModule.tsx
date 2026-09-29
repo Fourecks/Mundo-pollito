@@ -86,7 +86,7 @@ const ScheduleView: React.FC<{
               className="flex items-center gap-1 text-xs font-semibold text-gray-900 dark:text-white hover:opacity-80 transition-opacity cursor-pointer shrink-0 mr-1"
             >
               <ChevronLeft className="w-4 h-4" />
-              <span>Más</span>
+              <span>Atrás</span>
             </button>
           )}
           <h3 className="text-base font-bold text-gray-900 dark:text-white tracking-tight truncate">
@@ -868,7 +868,7 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
               className="flex items-center gap-1 text-xs font-semibold text-gray-900 dark:text-white hover:opacity-80 transition-opacity cursor-pointer"
             >
               <ChevronLeft className="w-4 h-4" />
-              <span>Más</span>
+              <span>Atrás</span>
             </button>
 
             <h3 className="text-sm font-bold text-gray-900 dark:text-white truncate max-w-[200px] text-center">
