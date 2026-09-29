@@ -59,6 +59,7 @@ interface MobileTasksProps {
     onSyncToCalendar?: (todo: Todo, provider?: CalendarProvider) => Promise<void> | void;
     taskToEdit?: Todo | null;
     setTaskToEdit?: (todo: Todo | null) => void;
+    userName?: string;
 }
 
 const formatDateKey = (date: Date): string => {
@@ -94,7 +95,8 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
     onUpdateTodo,
     onDeleteTodo,
     taskToEdit: externalTaskToEdit,
-    setTaskToEdit: externalSetTaskToEdit
+    setTaskToEdit: externalSetTaskToEdit,
+    userName = 'Axel'
 }) => {
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const [expandedTasks, setExpandedTasks] = useState<number[]>([]);
@@ -1425,23 +1427,25 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
     // PAGE 1: TASK LIST (PÁGINA PRINCIPAL TAREAS)
     // ==========================================
     return (
-        <div className="flex flex-col min-h-full bg-white dark:bg-black text-zinc-900 dark:text-zinc-50 pb-40 pt-8 px-4 sm:px-6">
-            {/* Header: Title and Add Task Button */}
-            <div className="flex justify-between items-center mb-5">
+        <div className="flex flex-col min-h-full bg-gradient-to-b from-purple-100/70 via-slate-50 to-white dark:from-purple-950/25 dark:via-zinc-950 dark:to-black text-zinc-900 dark:text-zinc-50 pb-40 pt-10 px-4 sm:px-6 font-sans">
+            {/* Header: Greeting & Add Task */}
+            <div className="flex justify-between items-start mb-6">
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">Tareas</h1>
-                    <p className="text-xs font-medium text-zinc-500 mt-0.5">
-                        {completedCount} de {totalCount} completadas
-                    </p>
+                    <span className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 tracking-wider uppercase block">
+                        PRODUCTIVIDAD
+                    </span>
+                    <h1 className="text-2xl font-black tracking-tight text-zinc-900 dark:text-white mt-0.5">
+                        Buenas noches, {userName}
+                    </h1>
                 </div>
                 <button 
                     type="button"
                     onClick={() => setIsDrawerOpen(true)}
-                    className="w-11 h-11 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-full flex items-center justify-center active:scale-95 transition-all shadow-md"
+                    className="w-12 h-12 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full flex items-center justify-center active:scale-95 transition-all shadow-lg shadow-indigo-500/25 cursor-pointer"
                     title="Nueva Tarea"
                     aria-label="Nueva Tarea"
                 >
-                    <Plus className="w-5 h-5" />
+                    <Plus className="w-6 h-6" />
                 </button>
                 <MobileTaskDrawer 
                     isOpen={isDrawerOpen} 
@@ -1463,12 +1467,12 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
                 />
             </div>
 
-            {/* Selector de Día (Día Anterior, Día Actual / Hoy, Día Siguiente) */}
-            <div className="flex items-center justify-between mb-4 bg-zinc-100/70 dark:bg-zinc-900/90 p-1.5 rounded-2xl border border-zinc-200/60 dark:border-zinc-800/80">
+            {/* Day Switcher */}
+            <div className="flex items-center justify-between mb-4 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md p-1.5 rounded-2xl border border-zinc-200/60 dark:border-zinc-800/80 shadow-2xs">
                 <button 
                     type="button"
                     onClick={handlePrevDay} 
-                    className="w-9 h-9 flex items-center justify-center rounded-xl active:bg-zinc-200 dark:active:bg-zinc-800 text-zinc-600 dark:text-zinc-400 transition-colors"
+                    className="w-9 h-9 flex items-center justify-center rounded-xl active:bg-zinc-100 dark:active:bg-zinc-800 text-zinc-600 dark:text-zinc-400 transition-colors"
                     aria-label="Día anterior"
                 >
                     <ChevronLeft className="w-4 h-4" />
@@ -1477,16 +1481,16 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
                 <button 
                     type="button"
                     onClick={handleResetToToday}
-                    className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 transition-colors text-zinc-800 dark:text-zinc-200"
+                    className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-zinc-800 dark:text-zinc-200"
                 >
-                    <CalendarIcon className="w-3.5 h-3.5 text-zinc-500" />
+                    <CalendarIcon className="w-3.5 h-3.5 text-indigo-500" />
                     <span>{isSelectedToday ? `Hoy (${format(selectedDate, 'd MMM', { locale: es })})` : getRelativeDateLabel(selectedDate)}</span>
                 </button>
 
                 <button 
                     type="button"
                     onClick={handleNextDay} 
-                    className="w-9 h-9 flex items-center justify-center rounded-xl active:bg-zinc-200 dark:active:bg-zinc-800 text-zinc-600 dark:text-zinc-400 transition-colors"
+                    className="w-9 h-9 flex items-center justify-center rounded-xl active:bg-zinc-100 dark:active:bg-zinc-800 text-zinc-600 dark:text-zinc-400 transition-colors"
                     aria-label="Día siguiente"
                 >
                     <ChevronRight className="w-4 h-4" />
@@ -1494,14 +1498,14 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
             </div>
 
             {/* View Filter Tabs: Para este día vs Sin Fecha */}
-            <div className="flex space-x-2 mb-4">
+            <div className="flex space-x-2 mb-6">
                 <button 
                     type="button"
                     onClick={() => setTabView('dated')}
                     className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
                         tabView === 'dated' 
                             ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 shadow-xs' 
-                            : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-500'
+                            : 'bg-white/80 dark:bg-zinc-900/80 text-zinc-500 border border-zinc-200/60 dark:border-zinc-800/60'
                     }`}
                 >
                     <CalendarIcon className="w-3.5 h-3.5" />
@@ -1520,7 +1524,7 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
                     className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
                         tabView === 'undated' 
                             ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 shadow-xs' 
-                            : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-500'
+                            : 'bg-white/80 dark:bg-zinc-900/80 text-zinc-500 border border-zinc-200/60 dark:border-zinc-800/60'
                     }`}
                 >
                     <ListTodo className="w-3.5 h-3.5" />
@@ -1535,161 +1539,147 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
                 </button>
             </div>
 
-            {/* Barra de Progreso del Día */}
-            {totalCount > 0 && (
-                <div className="mb-5 flex items-center gap-3 bg-zinc-50 dark:bg-zinc-900/60 p-3 rounded-2xl border border-zinc-200/60 dark:border-zinc-800/60">
-                    <div className="flex-1 h-2 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
-                        <div 
-                            className="h-full bg-emerald-500 transition-all duration-500 ease-out rounded-full"
-                            style={{ width: `${progress}%` }}
-                        />
-                    </div>
-                    <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">{progress}%</span>
-                </div>
-            )}
+            {/* SECCIÓN HOY */}
+            <div className="space-y-3 mb-7">
+                <h2 className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
+                    HOY
+                </h2>
 
-            {/* Lista de Tareas */}
-            <div className="space-y-2.5">
+                <div className="space-y-3">
                     {sortedTasks.map(task => {
                         const project = projects.find(p => p.id === task.project_id);
-                        const isRange = !!task.due_date && !!task.end_date && task.end_date > task.due_date;
-                        const subtasksCount = task.subtasks?.length || 0;
-                        const completedSubtasks = task.subtasks?.filter(s => s.completed).length || 0;
+                        const isHigh = task.priority === 'high';
+                        const accentColor = isHigh ? 'bg-rose-500' : (project?.color || 'bg-indigo-500');
 
                         return (
                             <div key={task.id} className="flex flex-col">
-                            <div
-                                className={`flex items-start gap-3 p-3.5 rounded-2xl border transition-all active:scale-[0.99] ${
-                                    task.completed 
-                                        ? 'bg-zinc-50/70 dark:bg-zinc-900/40 border-zinc-200/40 dark:border-zinc-800/40 opacity-60' 
-                                        : 'bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 shadow-xs'
-                                }`}
-                            >
-                                <button 
-                                    type="button"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        toggleTodo(task.id);
-                                    }}
-                                    className="mt-0.5 shrink-0"
-                                    aria-label={`Marcar ${task.text} como ${task.completed ? 'incompleta' : 'completada'}`}
+                                <div
+                                    className={`bg-white dark:bg-zinc-900/90 rounded-2xl p-4 shadow-2xs border border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between gap-3 transition-all hover:shadow-xs ${
+                                        task.completed ? 'opacity-60' : ''
+                                    }`}
                                 >
-                                    {task.completed ? (
-                                        <CheckCircle2 className="w-5 h-5 text-emerald-500 fill-emerald-500/20" />
-                                    ) : (
-                                        <Circle className="w-5 h-5 text-zinc-300 dark:text-zinc-700 hover:text-zinc-500" />
-                                    )}
-                                </button>
-                                
-                                <div 
-                                    className="flex-1 min-w-0 cursor-pointer"
-                                    onClick={() => handleOpenEditPage(task)}
-                                >
-                                    <h3 className={`text-sm font-medium leading-snug ${
-                                        task.completed ? 'line-through text-zinc-400 dark:text-zinc-500' : 'text-zinc-900 dark:text-zinc-100'
-                                    }`}>
-                                        {task.text}
-                                    </h3>
-                                    
-                                    {/* Badges / Tags */}
-                                    <div className="flex flex-wrap items-center gap-2 mt-2 text-[11px] font-medium">
-                                        {/* Date / Date Range Badge */}
-                                        {task.due_date && (
-                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 font-medium">
-                                                <CalendarIcon className="w-3 h-3 text-zinc-400" />
-                                                <span>{formatDateRangeSafe(task.due_date, task.end_date)}</span>
-                                            </span>
-                                        )}
+                                    {/* Accent Vertical Bar */}
+                                    <div 
+                                        className="w-1.5 self-stretch rounded-full shrink-0" 
+                                        style={{ backgroundColor: project?.color || (isHigh ? '#f43f5e' : '#6366f1') }}
+                                    />
 
-                                        {/* Time Badge */}
-                                        {task.start_time && (
-                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 font-medium">
-                                                <Clock className="w-3 h-3 text-zinc-400" />
+                                    {/* Task Main Details */}
+                                    <div 
+                                        className="flex-1 min-w-0 cursor-pointer"
+                                        onClick={() => handleOpenEditPage(task)}
+                                    >
+                                        <h3 className={`text-sm font-bold leading-snug ${
+                                            task.completed ? 'line-through text-zinc-400 dark:text-zinc-500' : 'text-zinc-900 dark:text-white'
+                                        }`}>
+                                            {task.text}
+                                        </h3>
+                                        <div className="flex items-center gap-2 mt-1 text-xs text-zinc-500 dark:text-zinc-400 font-medium">
+                                            {task.start_time && (
                                                 <span>{formatTime12h(task.start_time)}{task.end_time ? ` - ${formatTime12h(task.end_time)}` : ''}</span>
-                                            </span>
-                                        )}
-
-                                        {/* Project Badge */}
-                                        {project && (
-                                            <span className="inline-flex items-center gap-1 text-zinc-500 dark:text-zinc-400">
-                                                <div 
-                                                    className="w-2 h-2 rounded-full" 
-                                                    style={{ backgroundColor: project.color || '#a1a1aa' }}
-                                                />
-                                                <span>{project.name}</span>
-                                            </span>
-                                        )}
-
-                                        {/* Priority Badge */}
-                                        {task.priority !== 'low' && (
-                                            <span className={`inline-flex items-center gap-1 ${
-                                                task.priority === 'high' ? 'text-rose-500 font-semibold' : 'text-amber-500 font-medium'
-                                            }`}>
-                                                
-                                                <span>{task.priority === 'high' ? 'Alta' : 'Media'}</span>
-                                            </span>
-                                        )}
-
-                                        {/* Subtasks Count */}
-                                        {subtasksCount > 0 && (
-                                            <span 
-                                                className="inline-flex items-center gap-1 text-zinc-500 dark:text-zinc-400 cursor-pointer hover:text-zinc-700"
-                                                onClick={(e) => toggleExpandTask(task.id, e)}
-                                            >
-                                                <CheckSquare className="w-3 h-3" />
-                                                <span>{completedSubtasks}/{subtasksCount}</span>
-                                                <ChevronDown className={`w-3 h-3 transition-transform ${expandedTasks.includes(task.id) ? 'rotate-180' : ''}`} />
-                                            </span>
-                                        )}
+                                            )}
+                                            {!task.start_time && task.due_date && (
+                                                <span>{formatDateRangeSafe(task.due_date, task.end_date)}</span>
+                                            )}
+                                            {project && (
+                                                <span className="text-indigo-600 dark:text-indigo-400 font-semibold">• {project.name}</span>
+                                            )}
+                                        </div>
                                     </div>
+
+                                    {/* Right Checkmark Button */}
+                                    <button 
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            toggleTodo(task.id);
+                                        }}
+                                        className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-all ${
+                                            task.completed
+                                                ? 'bg-emerald-500 text-white shadow-xs'
+                                                : 'bg-indigo-500/15 dark:bg-indigo-500/25 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-600 hover:text-white'
+                                        }`}
+                                        aria-label={`Marcar ${task.text}`}
+                                    >
+                                        <Check className="w-4 h-4 stroke-[3]" />
+                                    </button>
                                 </div>
                             </div>
-                            
-                            {/* Expanded Subtasks */}
-                            {expandedTasks.includes(task.id) && subtasksCount > 0 && (
-                                <div className="pl-14 pr-4 pb-2 mt-1 space-y-2" onClick={e => e.stopPropagation()}>
-                                    {task.subtasks?.map(subtask => (
-                                        <label key={subtask.id} className="flex items-center gap-3 cursor-pointer group">
-                                            <div className="relative flex items-center justify-center">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={subtask.completed}
-                                                    onChange={() => {
-                                                        const newSubtasks = task.subtasks!.map(s => s.id === subtask.id ? { ...s, completed: !s.completed } : s);
-                                                        if (onUpdateTodo) {
-                                                            onUpdateTodo({ ...task, subtasks: newSubtasks });
-                                                        }
-                                                    }}
-                                                    className="sr-only"
-                                                />
-                                                <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${subtask.completed ? 'bg-zinc-900 border-zinc-900 dark:bg-white dark:border-white' : 'border-zinc-300 dark:border-zinc-600'}`}>
-                                                    {subtask.completed && <Check className="w-3 h-3 text-white dark:text-zinc-900" strokeWidth={3} />}
-                                                </div>
-                                            </div>
-                                            <span className={`text-sm ${subtask.completed ? 'line-through text-zinc-400 dark:text-zinc-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
-                                                {subtask.title || subtask.text}
-                                            </span>
-                                        </label>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
                         );
                     })}
-                
-                {sortedTasks.length === 0 && (
-                    <div className="text-center py-16 px-4 bg-zinc-50/50 dark:bg-zinc-900/30 rounded-3xl border border-dashed border-zinc-200 dark:border-zinc-800">
-                        <div className="w-12 h-12 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center mx-auto mb-3 text-zinc-400">
-                            <CheckSquare className="w-5 h-5" />
+
+                    {sortedTasks.length === 0 && (
+                        <div className="text-center py-10 px-4 bg-white/60 dark:bg-zinc-900/40 rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-800">
+                            <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+                                {tabView === 'dated' ? 'Sin tareas programadas para hoy' : 'Sin tareas en esta vista'}
+                            </p>
                         </div>
-                        <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
-                            {tabView === 'dated' ? 'No hay tareas para este día' : 'No hay tareas sin fecha'}
-                        </p>
-                        <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                            Toca el botón + para añadir una tarea a esta vista.
-                        </p>
-                    </div>
-                )}
+                    )}
+                </div>
+            </div>
+
+            {/* SECCIÓN MIS CATEGORÍAS / PROYECTOS */}
+            <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                    <h2 className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
+                        MIS PROYECTOS Y CATEGORÍAS
+                    </h2>
+                    <span className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400">
+                        {projects.length} en total
+                    </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                    {projects.map((proj, index) => {
+                        const projTasks = (allTodos[selectedDateKey] || []).filter(t => t.project_id === proj.id && !t.completed);
+                        const pastelBgs = [
+                            'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400',
+                            'bg-rose-100 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400',
+                            'bg-indigo-100 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400',
+                            'bg-cyan-100 dark:bg-cyan-950/50 text-cyan-600 dark:text-cyan-400',
+                            'bg-amber-100 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400',
+                            'bg-purple-100 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400',
+                        ];
+                        const iconBg = pastelBgs[index % pastelBgs.length];
+
+                        return (
+                            <div 
+                                key={proj.id}
+                                className="bg-white dark:bg-zinc-900/90 rounded-2xl p-3.5 shadow-2xs border border-zinc-100 dark:border-zinc-800/80 flex flex-col justify-between min-h-[125px] active:scale-[0.98] transition-all cursor-pointer hover:shadow-xs"
+                                onClick={() => {
+                                    setTabView('dated');
+                                }}
+                            >
+                                <div className="flex items-center justify-between">
+                                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-sm ${iconBg}`}>
+                                        {proj.emoji || '📦'}
+                                    </div>
+                                    <div className="w-6 h-6 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-400 flex items-center justify-center text-xs">
+                                        <ChevronRight className="w-3.5 h-3.5" />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <h3 className="text-xs font-bold text-zinc-900 dark:text-white mt-2.5 line-clamp-2 leading-snug">
+                                        {proj.name}
+                                    </h3>
+                                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                                        {projTasks.length} pendientes
+                                    </p>
+                                    <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 mt-1 block">
+                                        {proj.project_mode === 'advanced' ? 'Avanzado' : 'Personal'}
+                                    </span>
+                                </div>
+                            </div>
+                        );
+                    })}
+
+                    {projects.length === 0 && (
+                        <div className="col-span-2 py-8 text-center bg-white/60 dark:bg-zinc-900/40 rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-800">
+                            <p className="text-xs text-zinc-500">No hay proyectos creados aún.</p>
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* Create Task Bottom Sheet */}

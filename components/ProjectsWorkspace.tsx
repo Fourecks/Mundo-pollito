@@ -126,6 +126,15 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     useEffect(() => {
         if (mobileTab && isMobile) {
             setActiveTabInternal(mobileTab as any);
+            setInboxModalOpen(false);
+            setShowQuickAddTaskModal(false);
+            setIsQuickAddOpen(false);
+            setIsMobileFiltersOpen(false);
+            setActiveTaskThreadItem(null);
+            setIsAddBoardTaskModalOpen(false);
+            setIsMobileChannelDrawerOpen(false);
+            setIsMobileFolderDrawerOpen(false);
+            setIsPlusMenuOpen(false);
         }
     }, [mobileTab, isMobile]);
 

@@ -439,6 +439,14 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
   };
   const [masSubScreen, setMasSubScreen] = useState<'calendar' | 'schedule' | 'library' | 'goals' | 'analytics' | null>(null);
 
+  useEffect(() => {
+    setActiveSubject(null);
+    setMasSubScreen(null);
+    setIsAddingSubject(false);
+    setIsAddingGoal(false);
+    setIsAddingReading(false);
+  }, [mobileTab]);
+
   // New Subject Form Extended State
   const [newSubjectName, setNewSubjectName] = useState('');
   const [newSubjectCode, setNewSubjectCode] = useState('');

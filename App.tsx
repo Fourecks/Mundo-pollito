@@ -2123,6 +2123,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                 <div className={activeTab === 'tasks' ? 'h-full flex flex-col' : 'hidden'}>
                     <div className="flex flex-col h-full">
                         <MobileTasks
+                            userName={capitalizedUserName}
                             allTodos={expandedAllTodos}
                             selectedDate={selectedDate}
                             setSelectedDate={setSelectedDate}
