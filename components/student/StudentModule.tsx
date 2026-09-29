@@ -1863,13 +1863,16 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
             created_at: new Date().toISOString()
           };
 
-          const newScheds: SubjectSchedule[] = (subjectData.days || []).map(d => ({
-            id: `sched-${newSubj.id}-${d}`,
+          const newScheds: SubjectSchedule[] = (subjectData.schedules && subjectData.schedules.length > 0
+            ? subjectData.schedules
+            : (subjectData.days || []).map(d => ({ day: d, start_time: subjectData.start_time || '08:00', end_time: subjectData.end_time || '10:00' }))
+          ).map((slot, index) => ({
+            id: `sched-${newSubj.id}-${index}-${Date.now()}`,
             user_id: userId,
             subject_id: newSubj.id,
-            day_of_week: d,
-            start_time: subjectData.start_time || '08:00',
-            end_time: subjectData.end_time || '10:00',
+            day_of_week: slot.day,
+            start_time: slot.start_time || '08:00',
+            end_time: slot.end_time || '10:00',
             repeat_weekly: true
           }));
 

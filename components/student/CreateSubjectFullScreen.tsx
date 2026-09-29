@@ -1,7 +1,14 @@
 import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, Clock, MapPin, User, Hash, Check } from 'lucide-react';
-import { renderSubjectIcon, SUBJECT_COLOR_PALETTES } from './subjectIcons';
+import { ChevronLeft, ChevronRight, Plus, Trash2 } from 'lucide-react';
+import { renderSubjectIcon } from './subjectIcons';
 import { SubjectIconPickerModal } from './SubjectIconPickerModal';
+
+export interface SubjectScheduleSlot {
+  id: string;
+  day: string;
+  start_time: string;
+  end_time: string;
+}
 
 interface CreateSubjectFullScreenProps {
   isOpen: boolean;
@@ -16,8 +23,23 @@ interface CreateSubjectFullScreenProps {
     days: string[];
     start_time: string;
     end_time: string;
+    schedules: Array<{
+      day: string;
+      start_time: string;
+      end_time: string;
+    }>;
   }) => Promise<void>;
 }
+
+const DAYS_OF_WEEK = [
+  { id: 'Lunes', label: 'Lunes', short: 'Lu' },
+  { id: 'Martes', label: 'Martes', short: 'Ma' },
+  { id: 'Miércoles', label: 'Miércoles', short: 'Mi' },
+  { id: 'Jueves', label: 'Jueves', short: 'Ju' },
+  { id: 'Viernes', label: 'Viernes', short: 'Vi' },
+  { id: 'Sábado', label: 'Sábado', short: 'Sa' },
+  { id: 'Domingo', label: 'Domingo', short: 'Do' }
+];
 
 export const CreateSubjectFullScreen: React.FC<CreateSubjectFullScreenProps> = ({
   isOpen,
@@ -30,30 +52,42 @@ export const CreateSubjectFullScreen: React.FC<CreateSubjectFullScreenProps> = (
   const [room, setRoom] = useState('');
   const [color, setColor] = useState('#0d9488');
   const [iconName, setIconName] = useState('Hammer');
-  const [days, setDays] = useState<string[]>(['Lunes', 'Miércoles', 'Viernes']);
-  const [startTime, setStartTime] = useState('08:00');
-  const [endTime, setEndTime] = useState('10:00');
+
+  // Multi-schedule slots state: each day can have independent start and end times, and multiple slots for the same day
+  const [scheduleSlots, setScheduleSlots] = useState<SubjectScheduleSlot[]>([
+    { id: 'slot-1', day: 'Lunes', start_time: '08:00', end_time: '10:00' },
+    { id: 'slot-2', day: 'Miércoles', start_time: '08:00', end_time: '10:00' },
+    { id: 'slot-3', day: 'Viernes', start_time: '08:00', end_time: '10:00' },
+  ]);
+
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen) return null;
 
-  const daysList = [
-    { id: 'Lunes', label: 'Lu' },
-    { id: 'Martes', label: 'Ma' },
-    { id: 'Miércoles', label: 'Mi' },
-    { id: 'Jueves', label: 'Ju' },
-    { id: 'Viernes', label: 'Vi' },
-    { id: 'Sábado', label: 'Sa' },
-    { id: 'Domingo', label: 'Do' }
-  ];
+  const handleAddSlot = () => {
+    const lastSlot = scheduleSlots[scheduleSlots.length - 1];
+    const newSlot: SubjectScheduleSlot = {
+      id: `slot-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      day: lastSlot ? lastSlot.day : 'Lunes',
+      start_time: lastSlot ? lastSlot.start_time : '08:00',
+      end_time: lastSlot ? lastSlot.end_time : '10:00',
+    };
+    setScheduleSlots([...scheduleSlots, newSlot]);
+  };
 
-  const toggleDay = (dayId: string) => {
-    if (days.includes(dayId)) {
-      setDays(days.filter(d => d !== dayId));
-    } else {
-      setDays([...days, dayId]);
-    }
+  const handleRemoveSlot = (idToRemove: string) => {
+    if (scheduleSlots.length <= 1) return;
+    setScheduleSlots(scheduleSlots.filter(s => s.id !== idToRemove));
+  };
+
+  const handleSlotChange = (id: string, field: keyof SubjectScheduleSlot, value: string) => {
+    setScheduleSlots(scheduleSlots.map(s => {
+      if (s.id === id) {
+        return { ...s, [field]: value };
+      }
+      return s;
+    }));
   };
 
   const handleFormSubmit = async (e: React.FormEvent) => {
@@ -62,6 +96,9 @@ export const CreateSubjectFullScreen: React.FC<CreateSubjectFullScreenProps> = (
 
     setIsSubmitting(true);
     try {
+      const uniqueDays = Array.from(new Set(scheduleSlots.map(s => s.day)));
+      const firstSlot = scheduleSlots[0] || { start_time: '08:00', end_time: '10:00' };
+
       await onSave({
         name: name.trim(),
         code: code.trim() || undefined,
@@ -69,10 +106,16 @@ export const CreateSubjectFullScreen: React.FC<CreateSubjectFullScreenProps> = (
         room: room.trim() || undefined,
         color,
         icon_name: iconName,
-        days: days.length > 0 ? days : ['Lunes'],
-        start_time: startTime || '08:00',
-        end_time: endTime || '10:00',
+        days: uniqueDays.length > 0 ? uniqueDays : ['Lunes'],
+        start_time: firstSlot.start_time || '08:00',
+        end_time: firstSlot.end_time || '10:00',
+        schedules: scheduleSlots.map(s => ({
+          day: s.day,
+          start_time: s.start_time,
+          end_time: s.end_time
+        }))
       });
+
       // Reset form
       setName('');
       setCode('');
@@ -80,9 +123,11 @@ export const CreateSubjectFullScreen: React.FC<CreateSubjectFullScreenProps> = (
       setRoom('');
       setColor('#0d9488');
       setIconName('Hammer');
-      setDays(['Lunes', 'Miércoles', 'Viernes']);
-      setStartTime('08:00');
-      setEndTime('10:00');
+      setScheduleSlots([
+        { id: 'slot-1', day: 'Lunes', start_time: '08:00', end_time: '10:00' },
+        { id: 'slot-2', day: 'Miércoles', start_time: '08:00', end_time: '10:00' },
+        { id: 'slot-3', day: 'Viernes', start_time: '08:00', end_time: '10:00' },
+      ]);
       onClose();
     } catch (err) {
       console.error("Error creating subject:", err);
@@ -91,10 +136,20 @@ export const CreateSubjectFullScreen: React.FC<CreateSubjectFullScreenProps> = (
     }
   };
 
-  const formattedDaysPreview = daysList
-    .filter(d => days.includes(d.id))
-    .map(d => d.label)
-    .join(' · ') || 'Sin días seleccionados';
+  // Preview formatting for schedules
+  const previewScheduleText = () => {
+    if (scheduleSlots.length === 0) return 'Sin horarios configurados';
+    if (scheduleSlots.length <= 2) {
+      return scheduleSlots.map(s => {
+        const shortDay = DAYS_OF_WEEK.find(d => d.id === s.day)?.short || s.day.substring(0, 2);
+        return `${shortDay} ${s.start_time} - ${s.end_time}`;
+      }).join(' · ');
+    }
+    const daysSummary = Array.from(new Set(scheduleSlots.map(s => {
+      return DAYS_OF_WEEK.find(d => d.id === s.day)?.short || s.day.substring(0, 2);
+    }))).join(' · ');
+    return `${scheduleSlots.length} horarios (${daysSummary})`;
+  };
 
   return (
     <div className="fixed inset-0 z-[80] bg-white dark:bg-[#0c0c0e] flex flex-col font-sans overflow-hidden">
@@ -164,11 +219,13 @@ export const CreateSubjectFullScreen: React.FC<CreateSubjectFullScreenProps> = (
               {/* Time & Days */}
               <div className="mt-auto pt-1 space-y-0.5">
                 <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                  {startTime} — {endTime}
+                  {previewScheduleText()}
                 </p>
-                <p className="text-xs font-bold tracking-tight" style={{ color: color }}>
-                  {formattedDaysPreview}
-                </p>
+                {code && (
+                  <p className="text-[11px] font-mono font-semibold" style={{ color: color }}>
+                    {code}
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -195,123 +252,143 @@ export const CreateSubjectFullScreen: React.FC<CreateSubjectFullScreenProps> = (
               />
             </div>
 
-            {/* Grid 2 Columnas: Código y Profesor */}
+            {/* Grid 2 Columnas: Código y Profesor (Sin iconos en los inputs) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div>
                 <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5">
-                  Código (Opcional)
+                  Código
                 </label>
-                <div className="relative">
-                  <Hash className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    value={code}
-                    onChange={e => setCode(e.target.value)}
-                    placeholder="EST-201"
-                    className="w-full pl-9 pr-3.5 py-2.5 bg-gray-50 dark:bg-zinc-900/80 border border-gray-200 dark:border-white/10 rounded-2xl text-xs font-mono focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white text-gray-900 dark:text-white"
-                  />
-                </div>
+                <input
+                  type="text"
+                  value={code}
+                  onChange={e => setCode(e.target.value)}
+                  placeholder="Ej: EST-201"
+                  className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-zinc-900/80 border border-gray-200 dark:border-white/10 rounded-2xl text-xs font-mono focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white text-gray-900 dark:text-white"
+                />
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5">
-                  Profesor / Docente (Opcional)
+                  Profesor / Docente
                 </label>
-                <div className="relative">
-                  <User className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    value={professor}
-                    onChange={e => setProfessor(e.target.value)}
-                    placeholder="Ej: Dr. Carlos Pérez"
-                    className="w-full pl-9 pr-3.5 py-2.5 bg-gray-50 dark:bg-zinc-900/80 border border-gray-200 dark:border-white/10 rounded-2xl text-xs focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white text-gray-900 dark:text-white"
-                  />
-                </div>
+                <input
+                  type="text"
+                  value={professor}
+                  onChange={e => setProfessor(e.target.value)}
+                  placeholder="Ej: Dr. Carlos Pérez"
+                  className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-zinc-900/80 border border-gray-200 dark:border-white/10 rounded-2xl text-xs focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white text-gray-900 dark:text-white"
+                />
               </div>
             </div>
 
-            {/* Aula */}
+            {/* Aula (Sin icono en el input) */}
             <div>
               <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5">
-                Aula / Salón (Opcional)
+                Aula / Salón
               </label>
-              <div className="relative">
-                <MapPin className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={room}
-                  onChange={e => setRoom(e.target.value)}
-                  placeholder="Ej: Edificio B - Aula 302"
-                  className="w-full pl-9 pr-3.5 py-2.5 bg-gray-50 dark:bg-zinc-900/80 border border-gray-200 dark:border-white/10 rounded-2xl text-xs focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white text-gray-900 dark:text-white"
-                />
-              </div>
+              <input
+                type="text"
+                value={room}
+                onChange={e => setRoom(e.target.value)}
+                placeholder="Ej: Edificio B - Aula 302"
+                className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-zinc-900/80 border border-gray-200 dark:border-white/10 rounded-2xl text-xs focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white text-gray-900 dark:text-white"
+              />
             </div>
           </div>
 
-          {/* 3. HORARIO Y DÍAS DE CLASE */}
+          {/* 3. HORARIOS PERSONALIZADOS (Permite múltiples horarios por día con horas independientes) */}
           <div className="space-y-4 pt-2 border-t border-gray-100 dark:border-white/10">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-              Horario y Días de Clase
-            </h3>
-
-            {/* Selector de Días */}
-            <div className="space-y-2">
-              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">
-                Días de la semana
-              </label>
-              <div className="grid grid-cols-7 gap-1.5">
-                {daysList.map(d => {
-                  const isSelected = days.includes(d.id);
-                  return (
-                    <button
-                      key={d.id}
-                      type="button"
-                      onClick={() => toggleDay(d.id)}
-                      className={`h-11 rounded-2xl text-xs font-bold flex flex-col items-center justify-center transition-all cursor-pointer ${
-                        isSelected
-                          ? 'bg-black text-white dark:bg-white dark:text-black shadow-xs scale-102'
-                          : 'bg-gray-100 dark:bg-zinc-900 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-800'
-                      }`}
-                    >
-                      <span>{d.label}</span>
-                    </button>
-                  );
-                })}
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                  Horarios de Clase
+                </h3>
+                <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                  Define horas de inicio y fin para cada día o añade varios turnos.
+                </p>
               </div>
+
+              <button
+                type="button"
+                onClick={handleAddSlot}
+                className="flex items-center gap-1 px-3 py-1.5 bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 text-gray-800 dark:text-gray-200 rounded-xl text-xs font-bold transition-all active:scale-95 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Añadir horario</span>
+              </button>
             </div>
 
-            {/* Horas Inicio y Fin */}
-            <div className="grid grid-cols-2 gap-3.5">
-              <div>
-                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5 flex items-center gap-1">
-                  <Clock className="w-3.5 h-3.5 text-gray-400" />
-                  <span>Hora de Inicio</span>
-                </label>
-                <input
-                  type="time"
-                  value={startTime}
-                  onChange={e => setStartTime(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-zinc-900/80 border border-gray-200 dark:border-white/10 rounded-2xl text-xs focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white text-gray-900 dark:text-white font-mono"
-                />
-              </div>
+            {/* List of schedule slots */}
+            <div className="space-y-3">
+              {scheduleSlots.map((slot, index) => (
+                <div
+                  key={slot.id}
+                  className="p-3.5 bg-gray-50 dark:bg-zinc-900/70 border border-gray-200/80 dark:border-white/10 rounded-2xl space-y-2.5 relative"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex-1">
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">
+                        Día {scheduleSlots.length > 1 ? `#${index + 1}` : ''}
+                      </label>
+                      <select
+                        value={slot.day}
+                        onChange={e => handleSlotChange(slot.id, 'day', e.target.value)}
+                        className="w-full px-3 py-2 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white text-gray-900 dark:text-white cursor-pointer"
+                      >
+                        {DAYS_OF_WEEK.map(d => (
+                          <option key={d.id} value={d.id}>
+                            {d.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
 
-              <div>
-                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5 flex items-center gap-1">
-                  <Clock className="w-3.5 h-3.5 text-gray-400" />
-                  <span>Hora de Fin</span>
-                </label>
-                <input
-                  type="time"
-                  value={endTime}
-                  onChange={e => setEndTime(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-zinc-900/80 border border-gray-200 dark:border-white/10 rounded-2xl text-xs focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white text-gray-900 dark:text-white font-mono"
-                />
-              </div>
+                    {scheduleSlots.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveSlot(slot.id)}
+                        className="p-2 text-gray-400 hover:text-red-500 rounded-xl hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors mt-4 cursor-pointer"
+                        title="Eliminar este horario"
+                        aria-label="Eliminar horario"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Hours Row (Start and End independently) */}
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">
+                        Hora Inicio
+                      </label>
+                      <input
+                        type="time"
+                        value={slot.start_time}
+                        onChange={e => handleSlotChange(slot.id, 'start_time', e.target.value)}
+                        className="w-full px-3 py-2 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-xs font-mono font-medium focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white text-gray-900 dark:text-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">
+                        Hora Fin
+                      </label>
+                      <input
+                        type="time"
+                        value={slot.end_time}
+                        onChange={e => handleSlotChange(slot.id, 'end_time', e.target.value)}
+                        className="w-full px-3 py-2 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-xs font-mono font-medium focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white text-gray-900 dark:text-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
           {/* 4. BOTÓN CREAR MATERIA */}
-          <div className="pt-4">
+          <div className="pt-2">
             <button
               type="submit"
               disabled={!name.trim() || isSubmitting}
