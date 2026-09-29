@@ -772,11 +772,11 @@ export const SubjectWorkspace: React.FC<Props> = ({
   return (
     <div className="w-full flex flex-col bg-white dark:bg-[#111] text-gray-900 dark:text-gray-100 font-sans">
       
-      {/* DESKTOP HEADER */}
-      <header className="hidden md:flex px-8 py-4 border-b border-gray-100 dark:border-white/5 items-center justify-between flex-shrink-0 gap-4" style={{ borderBottomColor: `${subject.color}30` }}>
+      {/* UNIFIED TOP APP BAR */}
+      <header className="px-4 sm:px-8 py-3.5 border-b border-gray-150 dark:border-white/10 bg-white dark:bg-[#111] sticky top-0 z-40 flex items-center justify-between gap-3 shadow-2xs" style={{ borderBottomColor: `${subject.color || '#0d9488'}30` }}>
         {activeUnit ? (
           <div className="flex items-center justify-between w-full">
-            <div className="flex items-center gap-3 min-w-0">
+            <div className="flex items-center gap-2.5 min-w-0">
               <button 
                 onClick={() => setActiveUnit(null)} 
                 className="p-2 rounded-xl border border-gray-200 dark:border-white/10 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors cursor-pointer text-gray-700 dark:text-gray-300 flex items-center gap-1 shrink-0 text-xs font-semibold"
@@ -786,7 +786,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                 <span>Atrás</span>
               </button>
               <div className="min-w-0 flex items-center gap-2">
-                <h2 className="text-base font-bold tracking-tight text-gray-900 dark:text-white truncate">
+                <h2 className="text-sm sm:text-base font-bold tracking-tight text-gray-900 dark:text-white truncate">
                   Unidad {units.findIndex(u => u.id === activeUnit.id) + 1}: {activeUnit.name}
                 </h2>
                 <button
@@ -810,7 +810,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
               </button>
               <button
                 onClick={() => setShowMobileActionSheet(true)}
-                className="px-4 py-2 rounded-xl bg-black dark:bg-white text-white dark:text-black hover:opacity-90 transition-opacity text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                className="px-3 sm:px-4 py-2 rounded-xl bg-black dark:bg-white text-white dark:text-black hover:opacity-90 transition-opacity text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs"
               >
                 <Plus className="w-4 h-4" />
                 <span>Añadir</span>
@@ -822,25 +822,25 @@ export const SubjectWorkspace: React.FC<Props> = ({
             <div className="flex items-center gap-3 min-w-0">
               <button 
                 onClick={onBack} 
-                className="p-2 rounded-xl border border-gray-200 dark:border-white/10 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors cursor-pointer text-gray-700 dark:text-gray-300 flex items-center gap-1 shrink-0 text-xs font-semibold"
-                title="Atrás"
+                className="p-2 rounded-xl border border-gray-200 dark:border-white/10 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors cursor-pointer text-gray-700 dark:text-gray-300 flex items-center gap-1 shrink-0 text-xs font-semibold active:scale-95"
+                title="Regresar"
               >
                 <ChevronLeft className="w-4 h-4" />
                 <span>Atrás</span>
               </button>
               <div 
-                className="w-9 h-9 rounded-xl flex items-center justify-center text-sm shrink-0 border border-gray-150/80 dark:border-white/10"
+                className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl flex items-center justify-center text-sm shrink-0 border border-gray-150/80 dark:border-white/10"
                 style={{
-                  backgroundColor: `${subject.color || '#0d9488'}18`,
+                  backgroundColor: `${subject.color || '#0d9488'}20`,
                   color: subject.color || '#0d9488'
                 }}
               >
-                {renderSubjectIcon(subject.icon_name || subject.emoji, "w-4 h-4")}
+                {renderSubjectIcon(subject.icon_name || subject.emoji, "w-5 h-5")}
               </div>
               <div className="min-w-0">
-                <h2 className="text-base sm:text-lg font-bold tracking-tight text-gray-900 dark:text-white truncate">{subject.name}</h2>
+                <h2 className="text-sm sm:text-lg font-bold tracking-tight text-gray-900 dark:text-white truncate leading-tight">{subject.name}</h2>
                 {subject.professor && (
-                  <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{subject.professor}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">{subject.professor}</p>
                 )}
               </div>
             </div>
@@ -848,7 +848,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
             <div className="flex items-center gap-2 shrink-0">
               <button
                 onClick={() => setShowMobileActionSheet(true)}
-                className="px-4 py-2 rounded-xl bg-black dark:bg-white text-white dark:text-black hover:opacity-90 transition-opacity text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                className="px-3.5 sm:px-4 py-2 rounded-xl bg-black dark:bg-white text-white dark:text-black hover:opacity-90 transition-opacity text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs active:scale-95"
               >
                 <Plus className="w-4 h-4" />
                 <span>Añadir</span>
@@ -876,79 +876,6 @@ export const SubjectWorkspace: React.FC<Props> = ({
             )}
           </button>
         ))}
-      </div>
-
-      {/* MOBILE HEADER */}
-      <div className="block md:hidden border-b border-gray-100 dark:border-white/10 bg-white dark:bg-[#111] px-4 pt-3 pb-3 shrink-0">
-        {activeUnit ? (
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <button
-                onClick={() => setActiveUnit(null)}
-                className="p-1 -ml-1 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors cursor-pointer shrink-0 flex items-center gap-0.5 text-xs font-semibold"
-              >
-                <ChevronLeft className="w-4 h-4" />
-                <span>Atrás</span>
-              </button>
-              <div className="min-w-0">
-                <h2 className="text-xs font-bold text-gray-900 dark:text-white truncate leading-tight">
-                  Unidad {units.findIndex(u => u.id === activeUnit.id) + 1}: {activeUnit.name}
-                </h2>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1.5 shrink-0">
-              <button
-                type="button"
-                onClick={(e) => handleToggleUnitStatus(activeUnit, e)}
-                className="px-2 py-0.5 rounded-full text-[10px] font-bold border border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white cursor-pointer"
-              >
-                {activeUnit.status === 'completed' ? 'Completada' : activeUnit.status === 'in_progress' ? 'En progreso' : 'Sin iniciar'}
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDeleteUnit(activeUnit.id)}
-                className="p-1 text-gray-400 hover:text-red-500 rounded transition-colors cursor-pointer"
-                title="Eliminar unidad"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-              <button
-                onClick={() => setShowMobileActionSheet(true)}
-                className="px-2.5 py-1 rounded-xl bg-black dark:bg-white text-white dark:text-black text-xs font-bold shadow-2xs cursor-pointer flex items-center gap-1"
-              >
-                <Plus className="w-3 h-3" />
-                <span>Añadir</span>
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <button
-                onClick={onBack}
-                className="p-1 -ml-1 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors cursor-pointer shrink-0 flex items-center gap-0.5 text-xs font-semibold"
-              >
-                <ChevronLeft className="w-4 h-4" />
-                <span>Atrás</span>
-              </button>
-              <div className="min-w-0">
-                <h2 className="text-sm font-bold text-gray-900 dark:text-white truncate leading-tight">{subject.name}</h2>
-                {subject.professor && (
-                  <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate leading-none mt-0.5">{subject.professor}</p>
-                )}
-              </div>
-            </div>
-
-            <button
-              onClick={() => setShowMobileActionSheet(true)}
-              className="px-3 py-1.5 rounded-xl bg-black dark:bg-white text-white dark:text-black text-xs font-bold shrink-0 hover:opacity-90 transition-opacity cursor-pointer shadow-2xs flex items-center gap-1"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Añadir</span>
-            </button>
-          </div>
-        )}
       </div>
 
       {/* Content Area */}
@@ -1080,87 +1007,210 @@ export const SubjectWorkspace: React.FC<Props> = ({
               ) : null}
 
               {/* CONTENIDO ACADÉMICO */}
-              <div className="space-y-3">
+              <div className="space-y-3 pt-1">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                  Contenido académico
+                  Módulos y Actividades
                 </h3>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
                   {/* Unidades Block */}
                   <button
                     onClick={() => { setActiveTab('units'); setMobileSubView('units'); }}
-                    className="p-3.5 bg-white dark:bg-[#151515] rounded-2xl border border-gray-100 dark:border-white/5 hover:border-gray-300 dark:hover:border-white/20 transition-all text-left flex flex-col justify-between"
+                    className="p-5 sm:p-6 bg-white dark:bg-[#16141f] rounded-3xl border border-gray-150/80 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20 shadow-xs hover:shadow-md transition-all text-left flex flex-col justify-between group cursor-pointer active:scale-[0.98] min-h-[140px]"
                   >
-                    <div>
-                      <span className="text-xs font-bold text-gray-900 dark:text-white block">Unidades</span>
-                      <span className="text-[10px] text-gray-400 mt-1 block">
-                        {units.length === 0 ? 'Sin iniciar' : `${units.filter(u => u.status === 'in_progress').length} en progreso`}
-                      </span>
+                    <div className="flex items-center justify-between w-full">
+                      <div 
+                        className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0"
+                        style={{ backgroundColor: `${subject.color || '#0d9488'}20`, color: subject.color || '#0d9488' }}
+                      >
+                        <FolderKanban className="w-5 h-5" />
+                      </div>
+                      <div className="w-7 h-7 rounded-full bg-gray-100 dark:bg-white/10 text-gray-400 group-hover:text-black dark:group-hover:text-white flex items-center justify-center transition-colors">
+                        <ChevronRight className="w-4 h-4" />
+                      </div>
+                    </div>
+                    <div className="mt-3">
+                      <h4 className="text-base font-bold text-gray-900 dark:text-white block group-hover:text-blue-500 transition-colors">
+                        Unidades & Temas
+                      </h4>
+                      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mt-0.5">
+                        {units.length === 0 ? 'Sin iniciar' : `${units.length} unidades · ${units.filter(u => u.status === 'completed').length} completadas`}
+                      </p>
                     </div>
                   </button>
 
                   {/* Tareas Block */}
                   <button
                     onClick={() => { setActiveTab('tasks'); setMobileSubView('tasks'); }}
-                    className="p-3.5 bg-white dark:bg-[#151515] rounded-2xl border border-gray-100 dark:border-white/5 hover:border-gray-300 dark:hover:border-white/20 transition-all text-left flex flex-col justify-between"
+                    className="p-5 sm:p-6 bg-white dark:bg-[#16141f] rounded-3xl border border-gray-150/80 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20 shadow-xs hover:shadow-md transition-all text-left flex flex-col justify-between group cursor-pointer active:scale-[0.98] min-h-[140px]"
                   >
-                    <div>
-                      <span className="text-xs font-bold text-gray-900 dark:text-white block">Tareas</span>
-                      <span className="text-[10px] text-gray-400 mt-1 block">
-                        {tasks.filter(t => !t.completed).length === 1 ? '1 pendiente' : `${tasks.filter(t => !t.completed).length} pendientes`}
-                      </span>
+                    <div className="flex items-center justify-between w-full">
+                      <div 
+                        className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 bg-blue-500/15 text-blue-500"
+                      >
+                        <CheckSquare className="w-5 h-5" />
+                      </div>
+                      <div className="w-7 h-7 rounded-full bg-gray-100 dark:bg-white/10 text-gray-400 group-hover:text-black dark:group-hover:text-white flex items-center justify-center transition-colors">
+                        <ChevronRight className="w-4 h-4" />
+                      </div>
+                    </div>
+                    <div className="mt-3">
+                      <h4 className="text-base font-bold text-gray-900 dark:text-white block group-hover:text-blue-500 transition-colors">
+                        Tareas & Entregas
+                      </h4>
+                      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mt-0.5">
+                        {tasks.filter(t => !t.completed).length === 1 ? '1 tarea pendiente' : `${tasks.filter(t => !t.completed).length} tareas pendientes`}
+                      </p>
                     </div>
                   </button>
 
                   {/* Exámenes Block */}
                   <button
                     onClick={() => { setActiveTab('exams'); setMobileSubView('exams'); }}
-                    className="p-3.5 bg-white dark:bg-[#151515] rounded-2xl border border-gray-100 dark:border-white/5 hover:border-gray-300 dark:hover:border-white/20 transition-all text-left flex flex-col justify-between"
+                    className="p-5 sm:p-6 bg-white dark:bg-[#16141f] rounded-3xl border border-gray-150/80 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20 shadow-xs hover:shadow-md transition-all text-left flex flex-col justify-between group cursor-pointer active:scale-[0.98] min-h-[140px]"
                   >
-                    <div>
-                      <span className="text-xs font-bold text-gray-900 dark:text-white block">Exámenes</span>
-                      <span className="text-[10px] text-gray-400 mt-1 block">
-                        {exams.filter(e => e.status !== 'completed').length === 1 ? '1 próximo' : `${exams.filter(e => e.status !== 'completed').length} próximos`}
-                      </span>
+                    <div className="flex items-center justify-between w-full">
+                      <div 
+                        className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 bg-amber-500/15 text-amber-500"
+                      >
+                        <Calendar className="w-5 h-5" />
+                      </div>
+                      <div className="w-7 h-7 rounded-full bg-gray-100 dark:bg-white/10 text-gray-400 group-hover:text-black dark:group-hover:text-white flex items-center justify-center transition-colors">
+                        <ChevronRight className="w-4 h-4" />
+                      </div>
+                    </div>
+                    <div className="mt-3">
+                      <h4 className="text-base font-bold text-gray-900 dark:text-white block group-hover:text-blue-500 transition-colors">
+                        Exámenes & Evaluaciones
+                      </h4>
+                      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mt-0.5">
+                        {exams.filter(e => e.status !== 'completed').length === 1 ? '1 próximo examen' : `${exams.filter(e => e.status !== 'completed').length} exámenes programados`}
+                      </p>
                     </div>
                   </button>
 
                   {/* Apuntes Block */}
                   <button
                     onClick={() => { setActiveTab('notes'); setMobileSubView('notes'); }}
-                    className="p-3.5 bg-white dark:bg-[#151515] rounded-2xl border border-gray-100 dark:border-white/5 hover:border-gray-300 dark:hover:border-white/20 transition-all text-left flex flex-col justify-between"
+                    className="p-5 sm:p-6 bg-white dark:bg-[#16141f] rounded-3xl border border-gray-150/80 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20 shadow-xs hover:shadow-md transition-all text-left flex flex-col justify-between group cursor-pointer active:scale-[0.98] min-h-[140px]"
                   >
-                    <div>
-                      <span className="text-xs font-bold text-gray-900 dark:text-white block">Apuntes</span>
-                      <span className="text-[10px] text-gray-400 mt-1 block">
-                        {notes.length === 1 ? '1 nota' : `${notes.length} notas`}
-                      </span>
+                    <div className="flex items-center justify-between w-full">
+                      <div 
+                        className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 bg-purple-500/15 text-purple-500"
+                      >
+                        <FileText className="w-5 h-5" />
+                      </div>
+                      <div className="w-7 h-7 rounded-full bg-gray-100 dark:bg-white/10 text-gray-400 group-hover:text-black dark:group-hover:text-white flex items-center justify-center transition-colors">
+                        <ChevronRight className="w-4 h-4" />
+                      </div>
                     </div>
-                  </button>
-
-                  {/* Proyectos Block */}
-                  <button
-                    onClick={() => { setActiveTab('projects'); setMobileSubView('projects'); }}
-                    className="p-3.5 bg-white dark:bg-[#151515] rounded-2xl border border-gray-100 dark:border-white/5 hover:border-gray-300 dark:hover:border-white/20 transition-all text-left flex flex-col justify-between"
-                  >
-                    <div>
-                      <span className="text-xs font-bold text-gray-900 dark:text-white block">Proyectos</span>
-                      <span className="text-[10px] text-gray-400 mt-1 block">
-                        {projects.length === 1 ? '1 vinculado' : `${projects.length} vinculados`}
-                      </span>
+                    <div className="mt-3">
+                      <h4 className="text-base font-bold text-gray-900 dark:text-white block group-hover:text-blue-500 transition-colors">
+                        Apuntes & Notas
+                      </h4>
+                      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mt-0.5">
+                        {notes.length === 1 ? '1 apunte guardado' : `${notes.length} apuntes registrados`}
+                      </p>
                     </div>
                   </button>
 
                   {/* Calificaciones Block */}
                   <button
                     onClick={() => { setActiveTab('grades'); setMobileSubView('grades'); }}
-                    className="p-3.5 bg-white dark:bg-[#151515] rounded-2xl border border-gray-100 dark:border-white/5 hover:border-gray-300 dark:hover:border-white/20 transition-all text-left flex flex-col justify-between"
+                    className="p-5 sm:p-6 bg-white dark:bg-[#16141f] rounded-3xl border border-gray-150/80 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20 shadow-xs hover:shadow-md transition-all text-left flex flex-col justify-between group cursor-pointer active:scale-[0.98] min-h-[140px]"
                   >
-                    <div>
-                      <span className="text-xs font-bold text-gray-900 dark:text-white block">Notas</span>
-                      <span className="text-[10px] text-gray-400 mt-1 block">
-                        {grades.length > 0 ? `Promedio ${currentGrade.toFixed(1)}` : 'Sin calificaciones'}
-                      </span>
+                    <div className="flex items-center justify-between w-full">
+                      <div 
+                        className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 bg-emerald-500/15 text-emerald-500"
+                      >
+                        <Award className="w-5 h-5" />
+                      </div>
+                      <div className="w-7 h-7 rounded-full bg-gray-100 dark:bg-white/10 text-gray-400 group-hover:text-black dark:group-hover:text-white flex items-center justify-center transition-colors">
+                        <ChevronRight className="w-4 h-4" />
+                      </div>
+                    </div>
+                    <div className="mt-3">
+                      <h4 className="text-base font-bold text-gray-900 dark:text-white block group-hover:text-blue-500 transition-colors">
+                        Calificaciones & Promedios
+                      </h4>
+                      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mt-0.5">
+                        {grades.length > 0 ? `Promedio actual: ${currentGrade.toFixed(1)} / ${subject.grade_scale || 10}` : 'Sin calificaciones registradas'}
+                      </p>
+                    </div>
+                  </button>
+
+                  {/* Sesiones de Estudio Block */}
+                  <button
+                    onClick={() => { setActiveTab('study'); setMobileSubView('study'); }}
+                    className="p-5 sm:p-6 bg-white dark:bg-[#16141f] rounded-3xl border border-gray-150/80 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20 shadow-xs hover:shadow-md transition-all text-left flex flex-col justify-between group cursor-pointer active:scale-[0.98] min-h-[140px]"
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <div 
+                        className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 bg-rose-500/15 text-rose-500"
+                      >
+                        <Clock className="w-5 h-5" />
+                      </div>
+                      <div className="w-7 h-7 rounded-full bg-gray-100 dark:bg-white/10 text-gray-400 group-hover:text-black dark:group-hover:text-white flex items-center justify-center transition-colors">
+                        <ChevronRight className="w-4 h-4" />
+                      </div>
+                    </div>
+                    <div className="mt-3">
+                      <h4 className="text-base font-bold text-gray-900 dark:text-white block group-hover:text-blue-500 transition-colors">
+                        Sesiones de Estudio
+                      </h4>
+                      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mt-0.5">
+                        {studySessions.length === 1 ? '1 sesión realizada' : `${studySessions.length} sesiones de estudio`}
+                      </p>
+                    </div>
+                  </button>
+
+                  {/* Flashcards Block */}
+                  <button
+                    onClick={() => { setActiveTab('flashcards'); setMobileSubView('flashcards'); }}
+                    className="p-5 sm:p-6 bg-white dark:bg-[#16141f] rounded-3xl border border-gray-150/80 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20 shadow-xs hover:shadow-md transition-all text-left flex flex-col justify-between group cursor-pointer active:scale-[0.98] min-h-[140px]"
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <div 
+                        className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 bg-indigo-500/15 text-indigo-500"
+                      >
+                        <Layers className="w-5 h-5" />
+                      </div>
+                      <div className="w-7 h-7 rounded-full bg-gray-100 dark:bg-white/10 text-gray-400 group-hover:text-black dark:group-hover:text-white flex items-center justify-center transition-colors">
+                        <ChevronRight className="w-4 h-4" />
+                      </div>
+                    </div>
+                    <div className="mt-3">
+                      <h4 className="text-base font-bold text-gray-900 dark:text-white block group-hover:text-blue-500 transition-colors">
+                        Flashcards & Mazos
+                      </h4>
+                      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mt-0.5">
+                        {decks.length === 1 ? '1 mazo disponible' : `${decks.length} mazos de repaso`}
+                      </p>
+                    </div>
+                  </button>
+
+                  {/* Proyectos Block */}
+                  <button
+                    onClick={() => { setActiveTab('projects'); setMobileSubView('projects'); }}
+                    className="p-5 sm:p-6 bg-white dark:bg-[#16141f] rounded-3xl border border-gray-150/80 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20 shadow-xs hover:shadow-md transition-all text-left flex flex-col justify-between group cursor-pointer active:scale-[0.98] min-h-[140px]"
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <div 
+                        className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 bg-teal-500/15 text-teal-500"
+                      >
+                        <Sparkles className="w-5 h-5" />
+                      </div>
+                      <div className="w-7 h-7 rounded-full bg-gray-100 dark:bg-white/10 text-gray-400 group-hover:text-black dark:group-hover:text-white flex items-center justify-center transition-colors">
+                        <ChevronRight className="w-4 h-4" />
+                      </div>
+                    </div>
+                    <div className="mt-3">
+                      <h4 className="text-base font-bold text-gray-900 dark:text-white block group-hover:text-blue-500 transition-colors">
+                        Proyectos
+                      </h4>
+                      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mt-0.5">
+                        {projects.length === 1 ? '1 proyecto vinculado' : `${projects.length} proyectos vinculados`}
+                      </p>
                     </div>
                   </button>
                 </div>

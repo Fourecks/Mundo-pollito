@@ -804,113 +804,117 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
     <div className="w-full h-full flex flex-col bg-white dark:bg-[#111] text-gray-900 dark:text-gray-100 overflow-hidden font-sans">
       
       {/* DESKTOP HEADER */}
-      <header className="hidden md:flex px-6 py-4 border-b border-gray-100 dark:border-white/10 flex-row items-center justify-between shrink-0 gap-4 bg-white dark:bg-[#111] sticky top-0 z-30">
-        <div>
-          <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">Estudio</h2>
-          <div className="flex items-center gap-4 mt-1.5">
-            <button onClick={() => { setActiveSubject(null); setActiveTab('dashboard'); }} className={`text-xs font-semibold transition-colors ${!activeSubject && activeTab === 'dashboard' ? 'text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}>Dashboard</button>
-            <button onClick={() => { setActiveSubject(null); setActiveTab('subjects'); }} className={`text-xs font-semibold transition-colors ${activeSubject || activeTab === 'subjects' ? 'text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}>Materias</button>
-            <button onClick={() => { setActiveSubject(null); setActiveTab('schedule'); }} className={`text-xs font-semibold transition-colors ${!activeSubject && activeTab === 'schedule' ? 'text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}>Horario</button>
-            <button onClick={() => { setActiveSubject(null); setActiveTab('calendar'); }} className={`text-xs font-semibold transition-colors ${!activeSubject && activeTab === 'calendar' ? 'text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}>Calendario</button>
-            <button onClick={() => { setActiveSubject(null); setActiveTab('library'); }} className={`text-xs font-semibold transition-colors ${!activeSubject && activeTab === 'library' ? 'text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}>Biblioteca</button>
-            <button onClick={() => { setActiveSubject(null); setActiveTab('goals'); }} className={`text-xs font-semibold transition-colors ${!activeSubject && activeTab === 'goals' ? 'text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}>Metas</button>
-            <button onClick={() => { setActiveSubject(null); setActiveTab('analytics'); }} className={`text-xs font-semibold transition-colors ${!activeSubject && activeTab === 'analytics' ? 'text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}>Analíticas</button>
+      {!activeSubject && (
+        <header className="hidden md:flex px-6 py-4 border-b border-gray-100 dark:border-white/10 flex-row items-center justify-between shrink-0 gap-4 bg-white dark:bg-[#111] sticky top-0 z-30">
+          <div>
+            <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">Estudio</h2>
+            <div className="flex items-center gap-4 mt-1.5">
+              <button onClick={() => { setActiveSubject(null); setActiveTab('dashboard'); }} className={`text-xs font-semibold transition-colors ${!activeSubject && activeTab === 'dashboard' ? 'text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}>Dashboard</button>
+              <button onClick={() => { setActiveSubject(null); setActiveTab('subjects'); }} className={`text-xs font-semibold transition-colors ${activeSubject || activeTab === 'subjects' ? 'text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}>Materias</button>
+              <button onClick={() => { setActiveSubject(null); setActiveTab('schedule'); }} className={`text-xs font-semibold transition-colors ${!activeSubject && activeTab === 'schedule' ? 'text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}>Horario</button>
+              <button onClick={() => { setActiveSubject(null); setActiveTab('calendar'); }} className={`text-xs font-semibold transition-colors ${!activeSubject && activeTab === 'calendar' ? 'text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}>Calendario</button>
+              <button onClick={() => { setActiveSubject(null); setActiveTab('library'); }} className={`text-xs font-semibold transition-colors ${!activeSubject && activeTab === 'library' ? 'text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}>Biblioteca</button>
+              <button onClick={() => { setActiveSubject(null); setActiveTab('goals'); }} className={`text-xs font-semibold transition-colors ${!activeSubject && activeTab === 'goals' ? 'text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}>Metas</button>
+              <button onClick={() => { setActiveSubject(null); setActiveTab('analytics'); }} className={`text-xs font-semibold transition-colors ${!activeSubject && activeTab === 'analytics' ? 'text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}>Analíticas</button>
+            </div>
           </div>
-        </div>
-        <div className="flex gap-3">
-          {activeTab === 'library' ? (
-            <button onClick={() => setIsAddingReading(true)} className="px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-xl hover:opacity-90 transition-opacity font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs">
-              <Plus className="w-4 h-4" />
-              Añadir lectura
-            </button>
-          ) : activeTab === 'goals' ? (
-            <button onClick={() => setIsAddingGoal(true)} className="px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-xl hover:opacity-90 transition-opacity font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs">
-              <Plus className="w-4 h-4" />
-              Nueva Meta
-            </button>
-          ) : (
-            <button onClick={() => setIsAddingSubject(true)} className="px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-xl hover:opacity-90 transition-opacity font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs">
-              <Plus className="w-4 h-4" />
-              Añadir materia
-            </button>
-          )}
-        </div>
-      </header>
+          <div className="flex gap-3">
+            {activeTab === 'library' ? (
+              <button onClick={() => setIsAddingReading(true)} className="px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-xl hover:opacity-90 transition-opacity font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs">
+                <Plus className="w-4 h-4" />
+                Añadir lectura
+              </button>
+            ) : activeTab === 'goals' ? (
+              <button onClick={() => setIsAddingGoal(true)} className="px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-xl hover:opacity-90 transition-opacity font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs">
+                <Plus className="w-4 h-4" />
+                Nueva Meta
+              </button>
+            ) : (
+              <button onClick={() => setIsAddingSubject(true)} className="px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-xl hover:opacity-90 transition-opacity font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs">
+                <Plus className="w-4 h-4" />
+                Añadir materia
+              </button>
+            )}
+          </div>
+        </header>
+      )}
 
       {/* MOBILE HEADER */}
-      <div className="block md:hidden border-b border-gray-100 dark:border-white/10 bg-white dark:bg-[#111] px-4 py-2.5 shrink-0 sticky top-0 z-30">
-        {!masSubScreen ? (
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              {onReturnToDashboard && (
-                <button
-                  type="button"
-                  onClick={onReturnToDashboard}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-100 dark:bg-zinc-800 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-zinc-700 active:scale-95 transition-all cursor-pointer"
-                  title="Volver al Dashboard principal"
-                >
-                  <ChevronLeft className="w-3.5 h-3.5" />
-                  <span>Dashboard</span>
-                </button>
-              )}
-              <h2 className="text-base font-bold tracking-tight text-gray-900 dark:text-white">Estudio</h2>
+      {!activeSubject && (
+        <div className="block md:hidden border-b border-gray-100 dark:border-white/10 bg-white dark:bg-[#111] px-4 py-2.5 shrink-0 sticky top-0 z-30">
+          {!masSubScreen ? (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {onReturnToDashboard && (
+                  <button
+                    type="button"
+                    onClick={onReturnToDashboard}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-100 dark:bg-zinc-800 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-zinc-700 active:scale-95 transition-all cursor-pointer"
+                    title="Volver al Dashboard principal"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                    <span>Dashboard</span>
+                  </button>
+                )}
+                <h2 className="text-base font-bold tracking-tight text-gray-900 dark:text-white">Estudio</h2>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsAddingSubject(true)}
+                className="w-8 h-8 rounded-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 flex items-center justify-center font-bold text-base active:scale-95 transition-transform shadow-xs cursor-pointer"
+                title="Añadir materia"
+              >
+                +
+              </button>
             </div>
+          ) : masSubScreen !== 'schedule' ? (
+            /* Header when inside a sub-screen from "Más" (except schedule which has its integrated bar) */
+            <div className="flex items-center justify-between py-1">
+              <button
+                type="button"
+                onClick={() => setMasSubScreen(null)}
+                className="flex items-center gap-1 text-xs font-semibold text-gray-900 dark:text-white hover:opacity-80 transition-opacity cursor-pointer"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                <span>Atrás</span>
+              </button>
 
-            <button
-              type="button"
-              onClick={() => setIsAddingSubject(true)}
-              className="w-8 h-8 rounded-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 flex items-center justify-center font-bold text-base active:scale-95 transition-transform shadow-xs cursor-pointer"
-              title="Añadir materia"
-            >
-              +
-            </button>
-          </div>
-        ) : masSubScreen !== 'schedule' ? (
-          /* Header when inside a sub-screen from "Más" (except schedule which has its integrated bar) */
-          <div className="flex items-center justify-between py-1">
-            <button
-              type="button"
-              onClick={() => setMasSubScreen(null)}
-              className="flex items-center gap-1 text-xs font-semibold text-gray-900 dark:text-white hover:opacity-80 transition-opacity cursor-pointer"
-            >
-              <ChevronLeft className="w-4 h-4" />
-              <span>Atrás</span>
-            </button>
+              <h3 className="text-sm font-bold text-gray-900 dark:text-white truncate max-w-[200px] text-center">
+                {masSubScreen === 'calendar' && 'Calendario académico'}
+                {masSubScreen === 'library' && 'Biblioteca y lecturas'}
+                {masSubScreen === 'goals' && 'Metas académicas'}
+                {masSubScreen === 'analytics' && 'Estadísticas'}
+              </h3>
 
-            <h3 className="text-sm font-bold text-gray-900 dark:text-white truncate max-w-[200px] text-center">
-              {masSubScreen === 'calendar' && 'Calendario académico'}
-              {masSubScreen === 'library' && 'Biblioteca y lecturas'}
-              {masSubScreen === 'goals' && 'Metas académicas'}
-              {masSubScreen === 'analytics' && 'Estadísticas'}
-            </h3>
-
-            <div>
-              {masSubScreen === 'library' ? (
-                <button
-                  type="button"
-                  onClick={() => setIsAddingReading(true)}
-                  className="w-8 h-8 rounded-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 flex items-center justify-center font-bold text-sm cursor-pointer shadow-2xs"
-                >
-                  +
-                </button>
-              ) : masSubScreen === 'goals' ? (
-                <button
-                  type="button"
-                  onClick={() => setIsAddingGoal(true)}
-                  className="w-8 h-8 rounded-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 flex items-center justify-center font-bold text-sm cursor-pointer shadow-2xs"
-                >
-                  +
-                </button>
-              ) : (
-                <div className="w-8 h-8" />
-              )}
+              <div>
+                {masSubScreen === 'library' ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsAddingReading(true)}
+                    className="w-8 h-8 rounded-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 flex items-center justify-center font-bold text-sm cursor-pointer shadow-2xs"
+                  >
+                    +
+                  </button>
+                ) : masSubScreen === 'goals' ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsAddingGoal(true)}
+                    className="w-8 h-8 rounded-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 flex items-center justify-center font-bold text-sm cursor-pointer shadow-2xs"
+                  >
+                    +
+                  </button>
+                ) : (
+                  <div className="w-8 h-8" />
+                )}
+              </div>
             </div>
-          </div>
-        ) : null}
-      </div>
+          ) : null}
+        </div>
+      )}
 
       {/* Main Content Area */}
-      <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-gray-50/50 dark:bg-[#0A0A0A] pb-32">
+      <div className={`flex-1 overflow-y-auto ${activeSubject ? 'p-0 pb-20' : 'p-4 md:p-8 pb-32'} bg-gray-50/50 dark:bg-[#0A0A0A]`}>
         {activeSubject ? (
           <SubjectWorkspace 
             key={activeSubject.id}
@@ -1365,11 +1369,8 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
               {mobileTab === 'resumen' && (
                 <div className="space-y-6 -mx-4 -mt-4 px-4 pt-4 pb-12 bg-white dark:bg-[#0c0c0e] min-h-full">
                   
-                  {/* HEADER: SEMESTRE Y SALUDO */}
+                  {/* HEADER: SALUDO */}
                   {(() => {
-                    const currentPeriod = periods.find(p => p.is_active) || periods[0];
-                    const semesterTitle = currentPeriod?.name?.toUpperCase() || '9NO SEMESTRE';
-                    
                     const getGreeting = () => {
                       const hour = new Date().getHours();
                       if (hour >= 5 && hour < 12) return 'Buenos días';
@@ -1381,10 +1382,7 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
 
                     return (
                       <div className="pt-2 pb-1">
-                        <span className="text-xs font-black tracking-wider text-[#3b82f6] dark:text-[#60a5fa] uppercase block">
-                          {semesterTitle}
-                        </span>
-                        <h1 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white tracking-tight mt-1">
+                        <h1 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white tracking-tight">
                           {getGreeting()}, {displayName}
                         </h1>
                       </div>
@@ -1561,10 +1559,7 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
                         const uniqueDays = Array.from(new Set(subjScheds.map(s => daysShortMap[s.day_of_week] || s.day_of_week.substring(0, 2))));
                         return uniqueDays.join(' · ');
                       }
-                      if (subj.days && subj.days.length > 0) {
-                        return subj.days.map(d => daysShortMap[d] || d.substring(0, 2)).join(' · ');
-                      }
-                      return 'Lu · Ju · Vi';
+                      return 'Sin horario';
                     };
 
                     const getFormattedTime = (subj: Subject) => {
@@ -1572,10 +1567,7 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
                       if (subjScheds.length > 0 && subjScheds[0].start_time && subjScheds[0].end_time) {
                         return `${subjScheds[0].start_time} — ${subjScheds[0].end_time}`;
                       }
-                      if (subj.start_time && subj.end_time) {
-                        return `${subj.start_time} — ${subj.end_time}`;
-                      }
-                      return '10:07 — 12:07';
+                      return '—';
                     };
 
                     return (
@@ -1857,34 +1849,14 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
             room: subjectData.room,
             color: subjectData.color,
             icon_name: subjectData.icon_name,
-            days: subjectData.days,
-            start_time: subjectData.start_time,
-            end_time: subjectData.end_time,
             created_at: new Date().toISOString()
           };
 
-          const newScheds: SubjectSchedule[] = (subjectData.schedules && subjectData.schedules.length > 0
-            ? subjectData.schedules
-            : (subjectData.days || []).map(d => ({ day: d, start_time: subjectData.start_time || '08:00', end_time: subjectData.end_time || '10:00' }))
-          ).map((slot, index) => ({
-            id: `sched-${newSubj.id}-${index}-${Date.now()}`,
-            user_id: userId,
-            subject_id: newSubj.id,
-            day_of_week: slot.day,
-            start_time: slot.start_time || '08:00',
-            end_time: slot.end_time || '10:00',
-            repeat_weekly: true
-          }));
-
           setSubjects(prev => [newSubj, ...prev]);
-          setSchedules(prev => [...prev, ...newScheds]);
           setIsAddingSubject(false);
 
           try {
             await syncableCreate('student_subjects', newSubj);
-            for (const sc of newScheds) {
-              await syncableCreate('student_subject_schedules', sc);
-            }
           } catch (err) {
             console.error("Error saving subject:", err);
           }
