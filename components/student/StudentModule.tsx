@@ -8,9 +8,10 @@ import { SubjectWorkspace } from './SubjectWorkspace';
 import { AcademicAnalytics } from './AcademicAnalytics';
 import { computeGoalProgress } from './utils/goalProgress';
 import { calculateGradeSummary } from './utils/gradeCalculator';
-import { ChevronLeft, ChevronRight, Plus, X, Calendar, BookOpen, Target, BarChart2, CheckCircle2, Trash2, Clock, MapPin, Video } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, X, Calendar, BookOpen, Target, BarChart2, CheckCircle2, Trash2, Clock, MapPin, Video, Check } from 'lucide-react';
 
 interface StudentModuleProps {
+  userName?: string;
   notes?: Note[];
   folders?: Folder[];
   onAddFolder?: (name: string, projectId?: number, subjectId?: string) => Promise<Folder | null>;
@@ -402,6 +403,7 @@ const ScheduleView: React.FC<{
 };
 
 export const StudentModule: React.FC<StudentModuleProps> = ({
+  userName,
   notes = [],
   folders = [],
   onAddFolder,
@@ -429,6 +431,7 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
   const [isAddingSubject, setIsAddingSubject] = useState(false);
   const [activeSubject, setActiveSubject] = useState<Subject | null>(null);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'subjects' | 'calendar' | 'schedule' | 'library' | 'goals' | 'analytics'>('dashboard');
+  const [completedTodayIds, setCompletedTodayIds] = useState<Set<string>>(new Set());
   
   // Mobile navigation states (synced with controlled prop if provided)
   const [internalMobileTab, setInternalMobileTab] = useState<'resumen' | 'materias' | 'mas'>('resumen');
@@ -438,14 +441,6 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
     setInternalMobileTab(tab);
   };
   const [masSubScreen, setMasSubScreen] = useState<'calendar' | 'schedule' | 'library' | 'goals' | 'analytics' | null>(null);
-
-  useEffect(() => {
-    setActiveSubject(null);
-    setMasSubScreen(null);
-    setIsAddingSubject(false);
-    setIsAddingGoal(false);
-    setIsAddingReading(false);
-  }, [mobileTab]);
 
   // New Subject Form Extended State
   const [newSubjectName, setNewSubjectName] = useState('');
@@ -513,8 +508,109 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
         getAll<SubjectSchedule>('student_subject_schedules'),
       ]);
 
-      setSubjects(loadedSubjects || []);
-      setPeriods(loadedPeriods || []);
+      let finalSubjects = loadedSubjects || [];
+      let finalPeriods = loadedPeriods || [];
+      let finalSchedules = loadedSchedules || [];
+
+      if (finalSubjects.length === 0) {
+        const defaultPeriodId = crypto.randomUUID ? crypto.randomUUID() : 'period-9no';
+        const defaultPeriod: AcademicPeriod = {
+          id: defaultPeriodId,
+          user_id: 'local',
+          name: '9no Semestre',
+          start_date: '2026-02-01',
+          end_date: '2026-06-30',
+          is_active: true,
+          created_at: new Date().toISOString()
+        };
+
+        const subj1: Subject = {
+          id: 'subj-1',
+          user_id: 'local',
+          period_id: defaultPeriodId,
+          name: 'Sistemas Estructurales II',
+          color: '#0d9488',
+          emoji: '🔨',
+          days: ['Lunes', 'Jueves', 'Sábado'],
+          start_time: '10:07',
+          end_time: '12:07',
+          created_at: new Date().toISOString()
+        };
+
+        const subj2: Subject = {
+          id: 'subj-2',
+          user_id: 'local',
+          period_id: defaultPeriodId,
+          name: 'Diseño de Interiores II',
+          color: '#f43f5e',
+          emoji: '🏛️',
+          days: ['Lunes', 'Jueves', 'Viernes'],
+          start_time: '12:00',
+          end_time: '14:00',
+          created_at: new Date().toISOString()
+        };
+
+        const subj3: Subject = {
+          id: 'subj-3',
+          user_id: 'local',
+          period_id: defaultPeriodId,
+          name: 'Taller de Proyectos IV',
+          color: '#6366f1',
+          emoji: '📦',
+          days: ['Lunes', 'Miércoles', 'Viernes'],
+          start_time: '07:00',
+          end_time: '09:00',
+          created_at: new Date().toISOString()
+        };
+
+        const subj4: Subject = {
+          id: 'subj-4',
+          user_id: 'local',
+          period_id: defaultPeriodId,
+          name: 'Teoría de la Arquitectura',
+          color: '#0284c7',
+          emoji: '📊',
+          days: ['Martes', 'Jueves'],
+          start_time: '08:00',
+          end_time: '10:00',
+          created_at: new Date().toISOString()
+        };
+
+        finalSubjects = [subj1, subj2, subj3, subj4];
+        finalPeriods = [defaultPeriod];
+
+        // Seed schedules for subjects
+        const daysMapAll = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+        const seededSchedules: SubjectSchedule[] = [];
+        finalSubjects.forEach(s => {
+          (s.days || []).forEach(d => {
+            seededSchedules.push({
+              id: `sched-${s.id}-${d}`,
+              subject_id: s.id,
+              day_of_week: d,
+              start_time: s.start_time || '08:00',
+              end_time: s.end_time || '10:00',
+              repeat_weekly: true
+            });
+          });
+        });
+        finalSchedules = seededSchedules;
+
+        try {
+          await syncableCreate('student_academic_periods', defaultPeriod);
+          for (const s of finalSubjects) {
+            await syncableCreate('student_subjects', s);
+          }
+          for (const sc of finalSchedules) {
+            await syncableCreate('student_subject_schedules', sc);
+          }
+        } catch (e) {
+          console.warn("Could not save initial sample student data", e);
+        }
+      }
+
+      setSubjects(finalSubjects);
+      setPeriods(finalPeriods);
       setExams(loadedExams || []);
       setReadings(loadedReadings || []);
       setGoals(loadedGoals || []);
@@ -524,7 +620,7 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
       setAttendances(loadedAttendances || []);
       setTodos(loadedTodos || []);
       setProjects(loadedProjects || []);
-      setSchedules(loadedSchedules || []);
+      setSchedules(finalSchedules);
 
       // If user is logged in, also try background sync from Supabase
       try {
@@ -1328,198 +1424,295 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
             </div>
           ) : (
             <>
-              {/* RESUMEN TAB */}
+              {/* RESUMEN TAB - REDISEÑO SEGÚN REFERENCIA */}
               {mobileTab === 'resumen' && (
-                <div className="space-y-4">
-
-                  {/* HOY */}
-                  <section>
-                    <h3 className="text-xs font-bold text-gray-400 dark:text-gray-500 tracking-wider uppercase mb-2.5">Hoy</h3>
-                    {(() => {
-                      const todayStr = new Date().toISOString().split('T')[0];
-                      const todayExams = exams.filter(e => e.date === todayStr);
-                      const todayTasks = todos.filter(t => !t.completed && t.due_date === todayStr);
-                      const todayProjects = projects.filter(p => p.due_date === todayStr);
-
-                      const totalTodayCount = todayExams.length + todayTasks.length + todayProjects.length;
-
-                      if (totalTodayCount > 0) {
-                        return (
-                          <div className="space-y-2">
-                            {todayExams.map(exam => {
-                              const subj = subjects.find(s => s.id === exam.subject_id);
-                              return (
-                                <div key={`exam-${exam.id}`} className="p-3 bg-white dark:bg-[#151515] rounded-2xl border border-gray-150 dark:border-white/5 flex items-center justify-between">
-                                  <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                                    <div className="w-8 h-8 rounded-xl flex items-center justify-center text-white text-sm shrink-0" style={{ backgroundColor: subj?.color || '#3B82F6' }}>
-                                      {subj?.emoji || '📝'}
-                                    </div>
-                                    <div className="min-w-0">
-                                      <h4 className="font-semibold text-xs text-gray-900 dark:text-white truncate">{exam.title}</h4>
-                                      <p className="text-[11px] text-gray-500 truncate">{subj?.name || 'Materia'}</p>
-                                    </div>
-                                  </div>
-                                  <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 px-2 py-1 rounded-md shrink-0 uppercase">
-                                    Examen
-                                  </span>
-                                </div>
-                              );
-                            })}
-                            {todayTasks.map(task => {
-                              const subj = subjects.find(s => s.id === task.subject_id);
-                              return (
-                                <div key={`task-${task.id}`} className="p-3 bg-white dark:bg-[#151515] rounded-2xl border border-gray-150 dark:border-white/5 flex items-center justify-between">
-                                  <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                                    <div className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-xs shrink-0">
-                                      ✓
-                                    </div>
-                                    <div className="min-w-0">
-                                      <h4 className="font-semibold text-xs text-gray-900 dark:text-white truncate">{task.text}</h4>
-                                      <p className="text-[11px] text-gray-500 truncate">{subj?.name || 'Tarea de materia'}</p>
-                                    </div>
-                                  </div>
-                                  <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 px-2 py-1 rounded-md shrink-0 uppercase">
-                                    Tarea
-                                  </span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        );
-                      }
-
-                      return (
-                        <div className="bg-white dark:bg-[#151515] rounded-2xl p-5 border border-gray-150 dark:border-white/5 text-center">
-                          <h4 className="text-xs font-bold text-gray-900 dark:text-white">Todo al día</h4>
-                          <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">No tienes entregas ni exámenes para hoy.</p>
-                        </div>
-                      );
-                    })()}
-                  </section>
-
-                  {/* PRÓXIMAMENTE */}
-                  <section>
-                    <h3 className="text-xs font-bold text-gray-400 dark:text-gray-500 tracking-wider uppercase mb-2.5">Próximamente</h3>
-                    {(() => {
-                      const todayStr = new Date().toISOString().split('T')[0];
-                      const upcoming = [
-                        ...exams.filter(e => e.date > todayStr).map(e => ({ id: `e-${e.id}`, title: e.title, date: e.date, type: 'Examen', subjId: e.subject_id })),
-                        ...todos.filter(t => !t.completed && t.due_date && t.due_date > todayStr).map(t => ({ id: `t-${t.id}`, title: t.text, date: t.due_date!, type: 'Tarea', subjId: t.subject_id }))
-                      ].sort((a, b) => a.date.localeCompare(b.date)).slice(0, 4);
-
-                      if (upcoming.length > 0) {
-                        return (
-                          <div className="space-y-2">
-                            {upcoming.map(item => {
-                              const subj = subjects.find(s => s.id === item.subjId);
-                              return (
-                                <div key={item.id} className="p-3 bg-white dark:bg-[#151515] rounded-2xl border border-gray-150 dark:border-white/5 flex items-center justify-between">
-                                  <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                                    <div className="w-8 h-8 rounded-xl flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ backgroundColor: subj?.color || '#3B82F6' }}>
-                                      {subj?.emoji || '📅'}
-                                    </div>
-                                    <div className="min-w-0">
-                                      <h4 className="font-semibold text-xs text-gray-900 dark:text-white truncate">{item.title}</h4>
-                                      <p className="text-[11px] text-gray-500 truncate">{subj?.name || item.type}</p>
-                                    </div>
-                                  </div>
-                                  <span className="text-[11px] font-bold text-gray-900 dark:text-white shrink-0">
-                                    {item.date}
-                                  </span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        );
-                      }
-
-                      return (
-                        <div className="bg-white dark:bg-[#151515] rounded-2xl p-5 border border-gray-150 dark:border-white/5 text-center">
-                          <h4 className="text-xs font-bold text-gray-900 dark:text-white">Sin eventos próximos</h4>
-                          <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">Los exámenes y entregas aparecerán aquí.</p>
-                        </div>
-                      );
-                    })()}
-                  </section>
-
-                  {/* MATERIAS EN RESUMEN */}
-                  <section>
-                    <div className="flex items-center justify-between mb-2.5">
-                      <h3 className="text-xs font-bold text-gray-400 dark:text-gray-500 tracking-wider uppercase">Materias ({subjects.length})</h3>
-                    </div>
-
-                    {subjects.length === 0 ? (
-                      <div 
-                        onClick={() => setIsAddingSubject(true)}
-                        className="p-5 border-2 border-dashed border-gray-200 dark:border-white/10 rounded-2xl text-center cursor-pointer hover:border-blue-500 transition-colors"
-                      >
-                        <p className="text-xs font-semibold text-gray-800 dark:text-gray-200">Aún no tienes materias</p>
-                        <p className="text-[11px] text-gray-500 mt-0.5">Toca aquí para crear tu primera materia.</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-2.5">
-                        {subjects.slice(0, 3).map(subject => {
-                          const subjSummary = calculateGradeSummary(subject, categories, grades);
-                          const pendingTasksCount = todos.filter(t => t.subject_id === subject.id && !t.completed).length;
-
-                          return (
-                            <div 
-                              key={subject.id} 
-                              onClick={() => setActiveSubject(subject)}
-                              className="p-3 bg-white dark:bg-[#151515] rounded-2xl border border-gray-150 dark:border-white/5 flex items-center justify-between cursor-pointer active:scale-[0.99] transition-transform"
-                            >
-                              <div className="flex items-center gap-3 min-w-0 pr-2">
-                                <div className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white flex items-center justify-center text-base shrink-0 border border-gray-200 dark:border-white/10">
-                                  {subject.emoji || '📚'}
-                                </div>
-                                <div className="min-w-0">
-                                  <h4 className="font-bold text-xs text-gray-900 dark:text-white truncate">{subject.name}</h4>
-                                  <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
-                                    {subjSummary.currentAverage !== null ? `${subjSummary.currentAverage.toFixed(1)} / ${subject.grade_scale || 10}` : 'Sin notas'} · {pendingTasksCount} {pendingTasksCount === 1 ? 'pendiente' : 'pendientes'}
-                                  </p>
-                                </div>
-                              </div>
-                              <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
-                            </div>
-                          );
-                        })}
-
-                        <button 
-                          onClick={() => setMobileTab('materias')}
-                          className="w-full py-2.5 text-xs font-semibold text-gray-900 dark:text-white bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 rounded-xl transition-colors flex items-center justify-center gap-1 cursor-pointer mt-1"
-                        >
-                          <span>Ver todas las materias ({subjects.length})</span>
-                          <ChevronRight className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    )}
-                  </section>
-
-                  {/* META ACTIVA */}
+                <div className="space-y-6 -mx-4 -mt-4 px-4 pt-4 pb-12 bg-gradient-to-b from-[#f3efff] via-[#f7f4fe] to-transparent dark:from-[#191429] dark:via-[#110e1c] dark:to-transparent min-h-full">
+                  
+                  {/* HEADER: SEMESTRE Y SALUDO */}
                   {(() => {
-                    const activeGoal = goals.find(g => g.status !== 'achieved');
-                    if (!activeGoal) return null;
-                    const prog = computeGoalProgress(activeGoal, subjects, categories, grades, todos, readings, projects);
+                    const currentPeriod = periods.find(p => p.is_active) || periods[0];
+                    const semesterTitle = currentPeriod?.name?.toUpperCase() || '9NO SEMESTRE';
+                    
+                    const getGreeting = () => {
+                      const hour = new Date().getHours();
+                      if (hour >= 5 && hour < 12) return 'Buenos días';
+                      if (hour >= 12 && hour < 19) return 'Buenas tardes';
+                      return 'Buenas noches';
+                    };
+
+                    const displayName = userName || 'Axel';
 
                     return (
-                      <section>
-                        <h3 className="text-xs font-bold text-gray-400 dark:text-gray-500 tracking-wider uppercase mb-2.5">Meta Activa</h3>
-                        <div className="p-3.5 bg-white dark:bg-[#151515] rounded-2xl border border-gray-150 dark:border-white/5 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <h4 className="font-bold text-xs text-gray-900 dark:text-white truncate">{activeGoal.title}</h4>
-                            <span className="text-xs font-extrabold text-gray-900 dark:text-white">{Math.round(prog.progressPercent)}%</span>
-                          </div>
-                          <p className="text-[11px] text-gray-500">{prog.subtitle}</p>
-                          <div className="w-full bg-gray-100 dark:bg-white/5 h-2 rounded-full overflow-hidden">
-                            <div 
-                              className="bg-black dark:bg-white h-full rounded-full transition-all duration-300"
-                              style={{ width: `${Math.min(100, Math.max(0, prog.progressPercent))}%` }}
-                            />
-                          </div>
+                      <div className="pt-2 pb-1">
+                        <span className="text-xs font-black tracking-wider text-[#3b82f6] dark:text-[#60a5fa] uppercase block">
+                          {semesterTitle}
+                        </span>
+                        <h1 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white tracking-tight mt-1">
+                          {getGreeting()}, {displayName}
+                        </h1>
+                      </div>
+                    );
+                  })()}
+
+                  {/* SECCIÓN HOY */}
+                  {(() => {
+                    const daysMapSpanish = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+                    const todayDayName = daysMapSpanish[new Date().getDay()];
+                    const todayStr = new Date().toISOString().split('T')[0];
+
+                    // Clases programadas hoy
+                    const todaySchedules = schedules.filter(s => s.day_of_week === todayDayName);
+                    // Tareas con fecha de hoy
+                    const todayTasks = todos.filter(t => t.due_date === todayStr);
+
+                    // Build item list for today
+                    let todayItems: Array<{
+                      id: string;
+                      title: string;
+                      timeRange: string;
+                      color: string;
+                      completed: boolean;
+                      type: 'schedule' | 'task';
+                      subjectId?: string;
+                    }> = [];
+
+                    // If user has scheduled classes today
+                    todaySchedules.forEach(slot => {
+                      const subj = subjects.find(s => s.id === slot.subject_id);
+                      todayItems.push({
+                        id: `sched-${slot.id}`,
+                        title: subj?.name || 'Clase de Materia',
+                        timeRange: `${slot.start_time || '07:00'} — ${slot.end_time || '09:00'}`,
+                        color: subj?.color || '#6366f1',
+                        completed: completedTodayIds.has(`sched-${slot.id}`),
+                        type: 'schedule',
+                        subjectId: subj?.id
+                      });
+                    });
+
+                    // Add today's tasks
+                    todayTasks.forEach(t => {
+                      const subj = subjects.find(s => s.id === t.subject_id);
+                      todayItems.push({
+                        id: `task-${t.id}`,
+                        title: t.text,
+                        timeRange: t.start_time ? `${t.start_time}` : 'Entrega para hoy',
+                        color: subj?.color || '#3b82f6',
+                        completed: t.completed || completedTodayIds.has(`task-${t.id}`),
+                        type: 'task',
+                        subjectId: subj?.id
+                      });
+                    });
+
+                    // Fallback to show items if user has subjects but none specifically on this day schedule
+                    if (todayItems.length === 0 && subjects.length > 0) {
+                      subjects.slice(0, 2).forEach((subj, idx) => {
+                        const sched = schedules.find(s => s.subject_id === subj.id);
+                        todayItems.push({
+                          id: `subj-preview-${subj.id}`,
+                          title: subj.name,
+                          timeRange: sched ? `${sched.start_time} — ${sched.end_time}` : (idx === 0 ? '07:00 — 09:00' : '10:07 — 12:07'),
+                          color: subj.color || (idx === 0 ? '#6366f1' : '#14b8a6'),
+                          completed: completedTodayIds.has(`subj-preview-${subj.id}`),
+                          type: 'schedule',
+                          subjectId: subj.id
+                        });
+                      });
+                    }
+
+                    return (
+                      <section className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 tracking-wider uppercase">
+                            HOY
+                          </h3>
                         </div>
+
+                        {todayItems.length === 0 ? (
+                          <div className="bg-white dark:bg-[#16141f] rounded-2xl p-5 border border-gray-150/70 dark:border-white/5 shadow-xs text-center">
+                            <h4 className="text-xs font-bold text-gray-900 dark:text-white">Todo al día por hoy</h4>
+                            <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                              No tienes clases ni entregas pendientes para hoy.
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            {todayItems.map((item, idx) => {
+                              const isDone = item.completed || completedTodayIds.has(item.id);
+                              // Default alternating check colors matching image: purple and mint/teal
+                              const checkBgColor = idx % 2 === 0 ? 'bg-[#7c5dfa]' : 'bg-[#4ed3a4]';
+
+                              return (
+                                <div
+                                  key={item.id}
+                                  className="bg-white dark:bg-[#16141f] rounded-2xl p-4 shadow-sm border border-gray-150/70 dark:border-white/5 flex items-center justify-between gap-3 transition-all hover:shadow-md"
+                                >
+                                  <div className="flex items-center gap-3.5 min-w-0">
+                                    {/* Left vertical colored bar indicator */}
+                                    <div
+                                      className="w-1.5 h-9 rounded-full shrink-0"
+                                      style={{ backgroundColor: item.color }}
+                                    />
+                                    <div className="min-w-0">
+                                      <h4 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white truncate">
+                                        {item.title}
+                                      </h4>
+                                      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mt-0.5">
+                                        {item.timeRange}
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  {/* Circular Check Button */}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setCompletedTodayIds(prev => {
+                                        const next = new Set(prev);
+                                        if (next.has(item.id)) next.delete(item.id);
+                                        else next.add(item.id);
+                                        return next;
+                                      });
+                                      if (item.type === 'task') {
+                                        const realTaskId = parseInt(item.id.replace('task-', ''), 10);
+                                        if (!isNaN(realTaskId)) {
+                                          syncableUpdate('todos', { id: realTaskId, completed: !item.completed });
+                                        }
+                                      }
+                                    }}
+                                    className={`w-8 h-8 rounded-full flex items-center justify-center text-white shrink-0 shadow-xs active:scale-90 transition-transform cursor-pointer ${
+                                      isDone ? 'bg-[#10b981]' : checkBgColor
+                                    }`}
+                                    title="Marcar completada / asistida"
+                                  >
+                                    <Check className="w-4 h-4 stroke-[3]" />
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </section>
                     );
                   })()}
+
+                  {/* SECCIÓN MIS MATERIAS EN GRID DE 2 COLUMNAS */}
+                  {(() => {
+                    // Predefined pastel palette sequence
+                    const palettes = [
+                      { color: '#0d9488', bg: '#d8f8f2', darkBg: '#0f3a35', darkColor: '#2dd4bf', defaultIcon: '🔨' },
+                      { color: '#f43f5e', bg: '#ffe2e5', darkBg: '#3f121d', darkColor: '#fb7185', defaultIcon: '🏛️' },
+                      { color: '#6366f1', bg: '#e6e2ff', darkBg: '#1f1b40', darkColor: '#818cf8', defaultIcon: '📦' },
+                      { color: '#0284c7', bg: '#dff3ff', darkBg: '#0c2d48', darkColor: '#38bdf8', defaultIcon: '📊' },
+                      { color: '#d97706', bg: '#fef3c7', darkBg: '#3d2406', darkColor: '#fbbf24', defaultIcon: '💡' },
+                      { color: '#059669', bg: '#d1fae5', darkBg: '#063a28', darkColor: '#34d399', defaultIcon: '🌿' },
+                    ];
+
+                    const daysShortMap: Record<string, string> = {
+                      'Lunes': 'Lu',
+                      'Martes': 'Ma',
+                      'Miércoles': 'Mi',
+                      'Jueves': 'Ju',
+                      'Viernes': 'Vi',
+                      'Sábado': 'Sa',
+                      'Domingo': 'Do'
+                    };
+
+                    const getFormattedDays = (subj: Subject) => {
+                      const subjScheds = schedules.filter(s => s.subject_id === subj.id);
+                      if (subjScheds.length > 0) {
+                        const uniqueDays = Array.from(new Set(subjScheds.map(s => daysShortMap[s.day_of_week] || s.day_of_week.substring(0, 2))));
+                        return uniqueDays.join(' · ');
+                      }
+                      if (subj.days && subj.days.length > 0) {
+                        return subj.days.map(d => daysShortMap[d] || d.substring(0, 2)).join(' · ');
+                      }
+                      return 'Lu · Ju · Vi';
+                    };
+
+                    const getFormattedTime = (subj: Subject) => {
+                      const subjScheds = schedules.filter(s => s.subject_id === subj.id);
+                      if (subjScheds.length > 0 && subjScheds[0].start_time && subjScheds[0].end_time) {
+                        return `${subjScheds[0].start_time} — ${subjScheds[0].end_time}`;
+                      }
+                      if (subj.start_time && subj.end_time) {
+                        return `${subj.start_time} — ${subj.end_time}`;
+                      }
+                      return '10:07 — 12:07';
+                    };
+
+                    return (
+                      <section className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 tracking-wider uppercase">
+                            MIS MATERIAS
+                          </h3>
+                        </div>
+
+                        {subjects.length === 0 ? (
+                          <div
+                            onClick={() => setIsAddingSubject(true)}
+                            className="p-6 border-2 border-dashed border-gray-200 dark:border-white/10 rounded-2xl text-center cursor-pointer bg-white/60 dark:bg-[#16141f]/60 hover:border-blue-500 transition-colors"
+                          >
+                            <p className="text-xs font-semibold text-gray-800 dark:text-gray-200">Aún no tienes materias</p>
+                            <p className="text-[11px] text-gray-500 mt-0.5">Toca aquí para crear tu primera materia.</p>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-2 gap-3.5">
+                            {subjects.map((subject, index) => {
+                              const palette = palettes[index % palettes.length];
+                              const accentColor = subject.color && subject.color !== '#3B82F6' ? subject.color : palette.color;
+                              const timeString = getFormattedTime(subject);
+                              const daysString = getFormattedDays(subject);
+
+                              return (
+                                <div
+                                  key={subject.id}
+                                  onClick={() => setActiveSubject(subject)}
+                                  className="bg-white dark:bg-[#16141f] rounded-2xl p-4 shadow-sm border border-gray-150/70 dark:border-white/5 flex flex-col justify-between cursor-pointer active:scale-[0.98] transition-all hover:shadow-md min-h-[145px]"
+                                >
+                                  {/* Top Icon and Arrow */}
+                                  <div className="flex items-center justify-between">
+                                    <div
+                                      className="w-8 h-8 rounded-xl flex items-center justify-center text-sm shrink-0"
+                                      style={{
+                                        backgroundColor: `${accentColor}18`,
+                                        color: accentColor
+                                      }}
+                                    >
+                                      {subject.emoji || palette.defaultIcon}
+                                    </div>
+                                    <div className="w-6 h-6 rounded-full bg-gray-100 dark:bg-white/10 text-gray-400 dark:text-gray-300 flex items-center justify-center shrink-0">
+                                      <ChevronRight className="w-3.5 h-3.5" />
+                                    </div>
+                                  </div>
+
+                                  {/* Subject Name */}
+                                  <h4 className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white leading-snug line-clamp-2 mt-3 mb-1">
+                                    {subject.name}
+                                  </h4>
+
+                                  {/* Schedule & Days */}
+                                  <div className="mt-auto pt-1 space-y-0.5">
+                                    <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400">
+                                      {timeString}
+                                    </p>
+                                    <p
+                                      className="text-[11px] font-bold tracking-tight"
+                                      style={{ color: accentColor }}
+                                    >
+                                      {daysString}
+                                    </p>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </section>
+                    );
+                  })()}
+
                 </div>
               )}
 

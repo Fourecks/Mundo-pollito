@@ -2123,7 +2123,6 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                 <div className={activeTab === 'tasks' ? 'h-full flex flex-col' : 'hidden'}>
                     <div className="flex flex-col h-full">
                         <MobileTasks
-                            userName={capitalizedUserName}
                             allTodos={expandedAllTodos}
                             selectedDate={selectedDate}
                             setSelectedDate={setSelectedDate}
@@ -2304,6 +2303,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                 <div className={activeTab === 'student' ? 'h-full flex flex-col' : 'hidden'}>
                     <div className="h-full">
                         <StudentModule
+                            userName={capitalizedUserName}
                             notes={notes}
                             folders={folders}
                             onAddFolder={handleAddFolder}
