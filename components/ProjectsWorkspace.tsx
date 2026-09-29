@@ -17,6 +17,8 @@ import { formatTime12h, formatDateSafe, formatDateRangeSafe, parseLocalDate } fr
 
 interface ProjectsWorkspaceProps {
     isMobile?: boolean;
+    mobileTab?: string;
+    setMobileTab?: (tab: string) => void;
     onBack?: () => void;
     currentUser?: any;
     projects: Project[];
@@ -115,9 +117,24 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     onOpenProjectEditor,
     pushPreferences,
     isMobile = false,
+    mobileTab,
+    setMobileTab,
     onBack
 }) => {
-    const [activeTab, setActiveTab] = useState<'overview' | 'kanban' | 'sprints' | 'roadmap' | 'docs' | 'chat' | 'expenses' | 'time' | 'team' | 'listas' | 'mas_menu' | 'mis_tareas'>('overview');
+    const [activeTab, setActiveTabInternal] = useState<'overview' | 'kanban' | 'sprints' | 'roadmap' | 'docs' | 'chat' | 'expenses' | 'time' | 'team' | 'listas' | 'mas_menu' | 'mis_tareas'>('overview');
+
+    useEffect(() => {
+        if (mobileTab && isMobile) {
+            setActiveTabInternal(mobileTab as any);
+        }
+    }, [mobileTab, isMobile]);
+
+    const setActiveTab = (tab: any) => {
+        setActiveTabInternal(tab);
+        if (setMobileTab) {
+            setMobileTab(tab);
+        }
+    };
     
     // Sprint Detail & Task Management
     const [sprintDetailModal, setSprintDetailModal] = useState<Sprint | null>(null);
@@ -1208,7 +1225,9 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         const sections = [
             {
                 title: 'PLANIFICACIÓN',
-                items: [
+                items: isMobile ? [
+                    { id: 'sprints', label: 'Sprints', icon: Target, badge: 0 }
+                ] : [
                     { id: 'sprints', label: 'Sprints', icon: Target, badge: 0 },
                     { id: 'roadmap', label: 'Hoja de Ruta', icon: CalendarIcon, badge: 0 }
                 ]
@@ -1219,13 +1238,13 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     { id: 'docs', label: 'Documentos', icon: FileText, badge: unreadTabCounts.docs }
                 ]
             },
-            {
+            ...(isMobile ? [] : [{
                 title: 'GESTIÓN',
                 items: [
                     { id: 'expenses', label: 'Gastos', icon: FileSpreadsheet, badge: unreadTabCounts.expenses },
                     { id: 'time', label: 'Tiempo', icon: Clock, badge: unreadTabCounts.time }
                 ]
-            },
+            }]),
             {
                 title: 'PROYECTO',
                 items: [
@@ -1465,73 +1484,6 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                             )}
                         </div>
                     </div>
-
-                    {/* New Mobile 4-Tab Navigation */}
-                    <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100 dark:border-gray-800/80">
-                        {((activeProject.project_mode || 'personal') === 'personal'
-                            ? [
-                                { id: 'inicio', label: 'Resumen', target: 'overview' },
-                                { id: 'tareas', label: 'Tareas', target: 'listas' },
-                                { id: 'tablero', label: 'Tablero', target: 'kanban' }
-                              ]
-                            : [
-                                { id: 'inicio', label: 'Inicio', target: 'overview' },
-                                { id: 'tareas', label: 'Tareas', target: 'mis_tareas' },
-                                { id: 'chat', label: 'Chat', target: 'chat' },
-                                { id: 'mas', label: 'Más', target: 'mas_menu' }
-                              ]
-                        ).map(tab => {
-                            const isActive = (activeProject.project_mode || 'personal') === 'personal'
-                                ? activeTab === tab.target
-                                : mobileMainTab === tab.id;
-                            return (
-                                <button
-                                    key={tab.id}
-                                    onClick={() => setActiveTab(tab.target as any)}
-                                    className={`relative px-2 py-1.5 text-sm font-bold transition-all ${
-                                        isActive 
-                                            ? 'text-gray-900 dark:text-white' 
-                                            : 'text-gray-500 dark:text-gray-400'
-                                    }`}
-                                >
-                                    {tab.label}
-                                    {isActive && (
-                                        <motion.div 
-                                            layoutId="mobileProjectNavIndicator"
-                                            className="absolute bottom-[-8px] left-0 right-0 h-0.5 bg-gray-900 dark:bg-white rounded-full"
-                                            transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                                        />
-                                    )}
-                                </button>
-                            );
-                        })}
-                    </div>
-
-                    {/* Sub-navigation for Tareas */}
-                    {(activeProject.project_mode || 'personal') !== 'personal' && mobileMainTab === 'tareas' && (
-                        <div className="flex items-center gap-2 px-4 py-2 overflow-x-auto no-scrollbar scrollbar-none border-b border-gray-100 dark:border-gray-800/80">
-                            {[
-                                { id: 'mis_tareas', label: 'Mis tareas' },
-                                { id: 'listas', label: 'Todas' },
-                                { id: 'kanban', label: 'Tablero' }
-                            ].map(sub => {
-                                const isActive = activeTab === sub.id;
-                                return (
-                                    <button
-                                        key={sub.id}
-                                        onClick={() => setActiveTab(sub.id as any)}
-                                        className={`px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider rounded-xl transition-colors whitespace-nowrap ${
-                                            isActive
-                                                ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900'
-                                                : 'bg-zinc-100 dark:bg-zinc-900/50 text-zinc-600 dark:text-zinc-400'
-                                        }`}
-                                    >
-                                        {sub.label}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    )}
                 </div>
             );
         }

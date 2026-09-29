@@ -1,5 +1,9 @@
 import React from 'react';
-import { Home, CheckSquare, Calendar, FileText, User, LayoutGrid, Focus, BookOpen, Clock, PieChart, ArrowRightLeft, Target, Landmark, Folder as FolderIcon, TrendingUp } from 'lucide-react';
+import { 
+  Home, CheckSquare, Calendar, FileText, User, LayoutGrid, Focus, BookOpen, Clock, 
+  PieChart, ArrowRightLeft, Target, Landmark, Folder as FolderIcon, TrendingUp, 
+  Columns, MessageSquare, SlidersHorizontal, CalendarDays, BarChart2, MoreHorizontal
+} from 'lucide-react';
 
 interface MobileNavProps {
   activeTab: string;
@@ -14,10 +18,12 @@ interface MobileNavProps {
   setNotesMobileTab?: (tab: string) => void;
   habitsMobileTab?: string;
   setHabitsMobileTab?: (tab: string) => void;
+  viewingProjectId?: number | null;
+  viewingProjectType?: 'personal' | 'advanced';
   hide?: boolean;
 }
 
-// Main Dashboard level nav items (only Home, Tareas, Calendario as requested)
+// Main Dashboard level nav items
 const mainNavItems = [
   { id: 'home', label: 'Inicio', icon: Home },
   { id: 'tasks', label: 'Tareas', icon: CheckSquare },
@@ -32,15 +38,23 @@ const studentNavItems = [
 ];
 
 const financeNavItems = [
-  { id: 'summary', label: 'Resumen', icon: PieChart },
+  { id: 'overview', label: 'Resumen', icon: PieChart },
   { id: 'transactions', label: 'Movimientos', icon: ArrowRightLeft },
-  { id: 'budget', label: 'Presupuesto', icon: Target },
-  { id: 'accounts', label: 'Cuentas', icon: Landmark },
+  { id: 'planning', label: 'Planificar', icon: Target },
+  { id: 'more', label: 'Más', icon: Landmark },
 ];
 
-const projectsNavItems = [
-  { id: 'projects_list', label: 'Proyectos', icon: FolderIcon },
-  { id: 'projects_workspace', label: 'Tablero', icon: LayoutGrid },
+const personalProjectNavItems = [
+  { id: 'overview', label: 'Resumen', icon: LayoutGrid },
+  { id: 'listas', label: 'Tareas', icon: CheckSquare },
+  { id: 'kanban', label: 'Tablero', icon: Columns },
+];
+
+const advancedProjectNavItems = [
+  { id: 'overview', label: 'Inicio', icon: Home },
+  { id: 'mis_tareas', label: 'Tareas', icon: CheckSquare },
+  { id: 'chat', label: 'Chat', icon: MessageSquare },
+  { id: 'mas_menu', label: 'Más', icon: SlidersHorizontal },
 ];
 
 const notesNavItems = [
@@ -49,8 +63,9 @@ const notesNavItems = [
 ];
 
 const habitsNavItems = [
-  { id: 'habits_today', label: 'Hoy', icon: Focus },
-  { id: 'habits_list', label: 'Hábitos', icon: CheckSquare },
+  { id: 'hoy', label: 'Hoy', icon: Focus },
+  { id: 'vista_semanal', label: 'Vista semanal', icon: CalendarDays },
+  { id: 'estadisticas', label: 'Estadísticas', icon: TrendingUp },
 ];
 
 const MobileNav: React.FC<MobileNavProps> = ({
@@ -58,17 +73,24 @@ const MobileNav: React.FC<MobileNavProps> = ({
   setActiveTab,
   studentMobileTab = 'resumen',
   setStudentMobileTab,
-  financeMobileTab = 'summary',
+  financeMobileTab = 'overview',
   setFinanceMobileTab,
-  projectsMobileTab = 'projects_list',
+  projectsMobileTab = 'overview',
   setProjectsMobileTab,
   notesMobileTab = 'notes_all',
   setNotesMobileTab,
-  habitsMobileTab = 'habits_today',
+  habitsMobileTab = 'hoy',
   setHabitsMobileTab,
+  viewingProjectId = null,
+  viewingProjectType = 'personal',
   hide = false,
 }) => {
   if (hide) return null;
+
+  // In project selector view (activeTab === 'projects' and no project selected), hide bottom menu
+  if (activeTab === 'projects' && !viewingProjectId) {
+    return null;
+  }
 
   // Determine which nav config to display based on activeTab
   let currentItems = mainNavItems;
@@ -88,7 +110,11 @@ const MobileNav: React.FC<MobileNavProps> = ({
       if (setFinanceMobileTab) setFinanceMobileTab(id);
     };
   } else if (activeTab === 'projects') {
-    currentItems = projectsNavItems;
+    if (viewingProjectType === 'advanced') {
+      currentItems = advancedProjectNavItems;
+    } else {
+      currentItems = personalProjectNavItems;
+    }
     currentActiveId = projectsMobileTab;
     onItemClick = (id: string) => {
       if (setProjectsMobileTab) setProjectsMobileTab(id);

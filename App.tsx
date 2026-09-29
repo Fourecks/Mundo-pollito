@@ -2151,6 +2151,8 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                                 <div className="h-full flex-1 overflow-hidden">
                                     <ProjectsWorkspace 
                                       isMobile={true}
+                                      mobileTab={projectsMobileTab}
+                                      setMobileTab={setProjectsMobileTab}
                                       onBack={handleBackFromProjectsWorkspace}
                                       currentUser={currentUser}
                                       projects={projects}
@@ -2238,6 +2240,8 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                         <MobileHabits
                             habits={habits}
                             records={habitRecords}
+                            mobileTab={habitsMobileTab}
+                            setMobileTab={setHabitsMobileTab}
                             onOpenHabitCreator={onOpenHabitCreator}
                             onOpenHabitEditor={onOpenHabitEditor}
                             onDeleteHabit={handleDeleteHabit}
@@ -2280,7 +2284,11 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                         <div className="w-8" />
                     </div>
                     <div className="h-full flex-1 overflow-y-auto">
-                        <FinanceModule />
+                        <FinanceModule 
+                          isMobile={true}
+                          mobileTab={financeMobileTab}
+                          setMobileTab={setFinanceMobileTab}
+                        />
                     </div>
                 </div>
 
@@ -2400,6 +2408,8 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
               setNotesMobileTab={setNotesMobileTab}
               habitsMobileTab={habitsMobileTab}
               setHabitsMobileTab={setHabitsMobileTab}
+              viewingProjectId={viewingProjectId}
+              viewingProjectType={((projects.find(p => p.id === viewingProjectId)?.project_mode || 'personal') === 'personal') ? 'personal' : 'advanced'}
               hide={Boolean(
                 isProjectEditorOpen || 
                 isAddTaskModalOpen || 

@@ -556,6 +556,8 @@ const FinancePortal: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 interface FinanceModuleProps {
   onClose?: () => void;
   isMobile?: boolean;
+  mobileTab?: string;
+  setMobileTab?: (tab: string) => void;
 }
 
 type TabType =
@@ -573,7 +575,12 @@ type TabType =
   | "settings";
 type TransactionType = "EXPENSE" | "INCOME" | "TRANSFER_OUT" | "TRANSFER_IN";
 
-export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile: propIsMobile }) => {
+export const FinanceModule: React.FC<FinanceModuleProps> = ({ 
+  onClose, 
+  isMobile: propIsMobile,
+  mobileTab,
+  setMobileTab
+}) => {
   // --- Responsive Mobile Detection ---
   const [screenIsMobile, setScreenIsMobile] = useState(() => {
     if (typeof window !== "undefined") {
@@ -593,9 +600,25 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
   const isMobile = propIsMobile ?? screenIsMobile;
 
   // --- Mobile Navigation State (Fase 1: Resumen | Movimientos | Planificar | Más) ---
-  const [mobileMainTab, setMobileMainTab] = useState<"overview" | "transactions" | "planning" | "more">("overview");
+  const [mobileMainTab, setMobileMainTabInternal] = useState<"overview" | "transactions" | "planning" | "more">("overview");
   const [mobilePlanSubView, setMobilePlanSubView] = useState<null | "budgets" | "calendar" | "subscriptions" | "installments" | "loans" | "savings" | "shopping">(null);
   const [mobileMoreSubView, setMobileMoreSubView] = useState<null | "debts" | "stats" | "closing" | "accounts" | "categories" | "security" | "settings" | "overdue_payments" | "upcoming_payments">(null);
+
+  useEffect(() => {
+    if (!mobileTab) return;
+    if (["overview", "transactions", "planning", "more"].includes(mobileTab)) {
+      setMobileMainTabInternal(mobileTab as any);
+      setMobilePlanSubView(null);
+      setMobileMoreSubView(null);
+    }
+  }, [mobileTab]);
+
+  const setMobileMainTab = (tab: "overview" | "transactions" | "planning" | "more") => {
+    setMobileMainTabInternal(tab);
+    if (setMobileTab) {
+      setMobileTab(tab);
+    }
+  };
 
   const getPlanSubViewTitle = (sub: string | null) => {
     switch (sub) {

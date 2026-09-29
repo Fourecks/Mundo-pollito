@@ -38,6 +38,8 @@ import { Habit, HabitRecord, HabitFrequency, FrequencyType } from '../types';
 interface MobileHabitsProps {
     habits: Habit[];
     records: HabitRecord[];
+    mobileTab?: string;
+    setMobileTab?: (tab: string) => void;
     onOpenHabitCreator?: () => void;
     onOpenHabitEditor?: (habit: Habit) => void;
     onDeleteHabit: (id: string | number) => void;
@@ -245,13 +247,33 @@ const weekdayItems = [
 const MobileHabits: React.FC<MobileHabitsProps> = ({
     habits = [],
     records = [],
+    mobileTab,
+    setMobileTab,
     onDeleteHabit,
     onToggleRecord,
     onAddHabit,
     onUpdateHabit
 }) => {
     // Navigation Subpage: 'main' | 'weekly' | 'stats' | 'create' | 'edit'
-    const [subPage, setSubPage] = useState<'main' | 'weekly' | 'stats' | 'create' | 'edit'>('main');
+    const [subPageInternal, setSubPageInternal] = useState<'main' | 'weekly' | 'stats' | 'create' | 'edit'>('main');
+
+    React.useEffect(() => {
+        if (!mobileTab) return;
+        if (mobileTab === 'hoy' || mobileTab === 'habits_today') setSubPageInternal('main');
+        else if (mobileTab === 'vista_semanal' || mobileTab === 'habits_weekly') setSubPageInternal('weekly');
+        else if (mobileTab === 'estadisticas' || mobileTab === 'habits_stats') setSubPageInternal('stats');
+    }, [mobileTab]);
+
+    const setSubPage = (page: 'main' | 'weekly' | 'stats' | 'create' | 'edit') => {
+        setSubPageInternal(page);
+        if (setMobileTab) {
+            if (page === 'main') setMobileTab('hoy');
+            else if (page === 'weekly') setMobileTab('vista_semanal');
+            else if (page === 'stats') setMobileTab('estadisticas');
+        }
+    };
+
+    const subPage = subPageInternal;
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [weeklyWeekStart, setWeeklyWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
     const [habitToEdit, setHabitToEdit] = useState<Habit | null>(null);
