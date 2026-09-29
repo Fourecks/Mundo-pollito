@@ -1,6 +1,6 @@
 -- ==============================================================================
 -- SCHEMA COMPLETO DEL MÓDULO ESTUDIANTIL (STUDENT MODULE) PARA SUPABASE
--- Copia y pega todo este script en el "SQL Editor" de tu proyecto de Supabase
+-- 100% IDEMPOTENTE Y SEGURO PARA EJECUTAR EN EL "SQL EDITOR"
 -- ==============================================================================
 
 -- 1. PERIODOS ACADÉMICOS
@@ -200,7 +200,7 @@ CREATE TABLE IF NOT EXISTS public.student_flashcards (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- RECURSOS DE ESTUDIO
+-- 13. RECURSOS DE ESTUDIO
 CREATE TABLE IF NOT EXISTS public.student_resources (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -213,7 +213,7 @@ CREATE TABLE IF NOT EXISTS public.student_resources (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- METAS Y MÉTRICAS DE RENDIMIENTO
+-- 14. METAS Y MÉTRICAS DE RENDIMIENTO
 CREATE TABLE IF NOT EXISTS public.student_study_targets (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -340,20 +340,37 @@ CREATE POLICY "student_flashcards_policy" ON public.student_flashcards FOR ALL U
 CREATE POLICY "student_resources_policy" ON public.student_resources FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "student_study_targets_policy" ON public.student_study_targets FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
--- SUSCRIPCIÓN EN TIEMPO REAL (REALTIME)
-ALTER PUBLICATION supabase_realtime ADD TABLE public.student_academic_periods;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.student_subjects;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.student_subject_schedules;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.student_grade_categories;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.student_grades;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.student_exams;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.student_readings;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.student_goals;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.student_attendance;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.student_study_sessions;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.student_units;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.student_topics;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.student_decks;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.student_flashcards;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.student_resources;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.student_study_targets;
+-- SUSCRIPCIÓN EN TIEMPO REAL (REALTIME CONDICIONAL - EVITA ERROR 42710)
+DO $$
+DECLARE
+    tbl text;
+    tables text[] := ARRAY[
+        'student_academic_periods',
+        'student_subjects',
+        'student_subject_schedules',
+        'student_grade_categories',
+        'student_grades',
+        'student_exams',
+        'student_readings',
+        'student_goals',
+        'student_attendance',
+        'student_study_sessions',
+        'student_units',
+        'student_topics',
+        'student_decks',
+        'student_flashcards',
+        'student_resources',
+        'student_study_targets'
+    ];
+BEGIN
+    FOREACH tbl IN ARRAY tables LOOP
+        IF NOT EXISTS (
+            SELECT 1 FROM pg_publication_tables 
+            WHERE pubname = 'supabase_realtime' 
+              AND schemaname = 'public' 
+              AND tablename = tbl
+        ) THEN
+            EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE public.%I;', tbl);
+        END IF;
+    END LOOP;
+END $$;
