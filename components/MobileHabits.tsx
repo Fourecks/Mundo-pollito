@@ -1030,25 +1030,7 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
                 </button>
             </div>
 
-            {/* Quick Navigation Action Pills: Vista Semanal & Estadísticas */}
-            <div className="grid grid-cols-2 gap-2 mb-3">
-                <button 
-                    type="button"
-                    onClick={() => setSubPage('weekly')}
-                    className="py-2.5 px-3 rounded-2xl bg-zinc-100/80 dark:bg-zinc-900/80 border border-zinc-200/60 dark:border-zinc-800/60 flex items-center justify-center gap-2 text-xs font-bold text-zinc-800 dark:text-zinc-200 active:scale-98 transition-all"
-                >
-                    <CalendarDays className="w-4 h-4 text-zinc-500" />
-                    <span>Vista Semanal</span>
-                </button>
-                <button 
-                    type="button"
-                    onClick={() => setSubPage('stats')}
-                    className="py-2.5 px-3 rounded-2xl bg-zinc-100/80 dark:bg-zinc-900/80 border border-zinc-200/60 dark:border-zinc-800/60 flex items-center justify-center gap-2 text-xs font-bold text-zinc-800 dark:text-zinc-200 active:scale-98 transition-all"
-                >
-                    <Activity className="w-4 h-4 text-zinc-500" />
-                    <span>Estadísticas</span>
-                </button>
-            </div>
+
 
             {/* Selector de Día (Día Anterior, Día Actual / Hoy, Día Siguiente) */}
             <div className="flex items-center justify-between mb-3.5 bg-zinc-100/70 dark:bg-zinc-900/90 p-1.5 rounded-2xl border border-zinc-200/60 dark:border-zinc-800/80">

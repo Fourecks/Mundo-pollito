@@ -358,6 +358,9 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     const [inboxFormText, setInboxFormText] = useState('');
     const [inboxFormType, setInboxFormType] = useState<'announcement' | 'idea' | 'alert' | 'note'>('announcement');
     const [inboxFormPriority, setInboxFormPriority] = useState<'normal' | 'high'>('normal');
+    const [bBandejaFilterSearch, setBBandejaFilterSearch] = useState('');
+    const [bBandejaFilterType, setBBandejaFilterType] = useState<string>('all');
+    const [bBandejaShowAddDrawer, setBBandejaShowAddDrawer] = useState(false);
 
     // Team Search State
     const [memberSearchText, setMemberSearchText] = useState<string>('');
@@ -1461,10 +1464,10 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                     <div className="relative">
                                         <button
                                             type="button"
-                                            onClick={() => setIsQuickAddOpen(true)}
+                                            onClick={() => setShowQuickAddTaskModal(true)}
                                             className="p-2 rounded-xl text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-                                            aria-label="Agregar al proyecto"
-                                            title="Agregar al proyecto"
+                                            aria-label="Añadir nueva tarea"
+                                            title="Añadir nueva tarea"
                                         >
                                             <Plus className="w-5 h-5" />
                                         </button>
@@ -1557,11 +1560,11 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                 <>
                                     <div className="relative">
                                         <button 
-                                            onClick={() => setIsQuickAddOpen(true)}
+                                            onClick={() => setShowQuickAddTaskModal(true)}
                                             className="px-2.5 py-1.5 text-xs bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:opacity-90 rounded-lg transition-all flex items-center gap-1.5 font-bold shadow-2xs"
-                                            title="Agregar al Proyecto"
+                                            title="Añadir Nueva Tarea"
                                         >
-                                            <Plus className="w-3.5 h-3.5" /> Agregar
+                                            <Plus className="w-3.5 h-3.5" /> Nueva Tarea
                                         </button>
                                     </div>
                                     <button 
@@ -1900,124 +1903,63 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
             return (
                 <div className="p-4 w-full h-full overflow-y-auto pb-28 space-y-4 font-sans">
-                    {/* 1. Progreso del Proyecto */}
-                    <div className="bg-white dark:bg-[#111] p-4 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs space-y-3">
-                        <div className="flex items-center justify-between">
-                            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Progreso del Proyecto</span>
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${healthBadgeClass}`}>
-                                {healthLabel}
-                            </span>
-                        </div>
-                        <div className="flex items-baseline justify-between">
-                            <span className="text-3xl font-black tracking-tight text-gray-900 dark:text-white">{progress}%</span>
-                            <span className="text-xs font-semibold text-gray-500">{completedTasks} de {totalTasks} tareas</span>
-                        </div>
-                        <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-2 overflow-hidden">
-                            <div className="bg-blue-600 dark:bg-blue-500 h-full rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
-                        </div>
-                    </div>
-
-                    {/* 2. Para Mí */}
-                    {myTopTasks.length > 0 && (
-                        <div className="bg-white dark:bg-[#111] rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs p-3.5 space-y-2.5">
+                    {/* 1 & 2: Progreso del Proyecto y Sprint Activo Side-by-Side */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {/* Progreso del Proyecto */}
+                        <div className="bg-white dark:bg-[#111] p-3.5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs flex flex-col justify-between space-y-2">
                             <div className="flex items-center justify-between">
-                                <h3 className="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
-                                    <CheckSquare className="w-3.5 h-3.5 text-blue-500" /> Para mí
-                                </h3>
-                                <button
-                                    onClick={() => setActiveTab('mis_tareas')}
-                                    className="text-[11px] text-blue-500 font-semibold"
-                                >
-                                    Ver mis tareas →
-                                </button>
+                                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Progreso</span>
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${healthBadgeClass}`}>
+                                    {healthLabel}
+                                </span>
                             </div>
-                            <div className="space-y-2">
-                                {myTopTasks.map(task => (
-                                    <div key={task.id} className="p-2.5 bg-gray-50 dark:bg-zinc-900/60 rounded-xl flex items-start gap-2.5 shadow-xs active:scale-[0.98] transition-transform cursor-pointer" onClick={() => onEditTodo && onEditTodo(task)}>
-                                        <button 
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                updateTodo(task.id, { completed: !task.completed });
-                                            }}
-                                            className="mt-0.5 shrink-0"
-                                        >
-                                            <Circle className="w-4 h-4 text-zinc-400" />
-                                        </button>
-                                        <div className="flex-1 min-w-0">
-                                            <h3 className="text-xs font-semibold truncate text-zinc-900 dark:text-zinc-100">{task.text}</h3>
-                                            {task.due_date && (
-                                                <p className={`text-[10px] font-bold mt-0.5 ${isPast(parseISO(task.due_date)) && !isToday(parseISO(task.due_date)) ? 'text-red-500' : isToday(parseISO(task.due_date)) ? 'text-amber-500' : 'text-zinc-500'}`}>
-                                                    Vence: {format(parseISO(task.due_date), 'd MMM', { locale: es })}
-                                                </p>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
+                            <div className="flex items-baseline justify-between">
+                                <span className="text-2xl font-black tracking-tight text-gray-900 dark:text-white">{progress}%</span>
+                                <span className="text-[11px] font-semibold text-gray-500">{completedTasks}/{totalTasks} tareas</span>
+                            </div>
+                            <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-1.5 overflow-hidden">
+                                <div className="bg-blue-600 dark:bg-blue-500 h-full rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
                             </div>
                         </div>
-                    )}
 
-                    {/* Quick Metric Tiles (2x2) */}
-                    <div className="grid grid-cols-2 gap-3">
-                        {/* 3. Sprint activo */}
+                        {/* Sprint Activo */}
                         <button
                             onClick={() => setActiveTab('sprints')}
-                            className="bg-white dark:bg-[#111] p-3.5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs text-left active:scale-[0.98] transition-all flex flex-col h-full"
+                            className="bg-white dark:bg-[#111] p-3.5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs text-left active:scale-[0.98] transition-all flex flex-col justify-between space-y-2"
                         >
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Sprint Activo</span>
+                            <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Sprint Activo</span>
+                                <span className="text-[10px] text-blue-500 font-bold hover:underline">Ver sprint →</span>
+                            </div>
                             {activeSprint ? (
                                 <>
-                                    <span className="text-sm font-bold text-gray-900 dark:text-white line-clamp-1 mb-1">{activeSprint.name}</span>
-                                    <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-1.5 overflow-hidden mb-1">
+                                    <div className="flex items-baseline justify-between min-w-0">
+                                        <span className="text-xs font-bold text-gray-900 dark:text-white truncate">{activeSprint.name}</span>
+                                        <span className="text-[10px] font-semibold text-gray-500 shrink-0 ml-1">
+                                            {activeSprint.todos.filter(t => t.completed).length}/{activeSprint.todos.length} tareas
+                                        </span>
+                                    </div>
+                                    <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-1.5 overflow-hidden">
                                         <div className="bg-blue-500 h-full rounded-full" style={{ width: `${Math.round((activeSprint.todos.filter(t => t.completed).length / (activeSprint.todos.length || 1)) * 100)}%` }} />
                                     </div>
-                                    <span className="text-[10px] text-gray-500 font-medium mb-auto">
-                                        {activeSprint.todos.filter(t => t.completed).length}/{activeSprint.todos.length} tareas
-                                    </span>
                                 </>
                             ) : (
-                                <span className="text-xs font-medium text-gray-500 mb-auto">Sin sprint activo</span>
+                                <span className="text-xs font-medium text-gray-500 my-auto">Sin sprint activo</span>
                             )}
-                            <span className="text-[10px] text-blue-500 font-bold mt-2 inline-block">
-                                {activeSprint ? 'Ver sprint →' : 'Planificar →'}
-                            </span>
                         </button>
 
-                        {/* 4. Próximo hito */}
-                        <button
-                            onClick={() => setActiveTab('roadmap')}
-                            className="bg-white dark:bg-[#111] p-3.5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs text-left active:scale-[0.98] transition-all flex flex-col h-full"
-                        >
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Próximo Hito</span>
-                            {pendingMilestones.length > 0 ? (
-                                <>
-                                    <span className="text-sm font-bold text-gray-900 dark:text-white line-clamp-1 mb-1">{pendingMilestones[0].name}</span>
-                                    {pendingMilestones[0].date && (
-                                        <span className={`text-[10px] font-medium mb-auto ${isPast(parseISO(pendingMilestones[0].date)) && !isToday(parseISO(pendingMilestones[0].date)) ? 'text-red-500' : 'text-amber-500'}`}>
-                                            {format(parseISO(pendingMilestones[0].date), 'd MMM yyyy', { locale: es })}
-                                        </span>
-                                    )}
-                                </>
-                            ) : (
-                                <span className="text-xs font-medium text-gray-500 mb-auto">Sin hitos pendientes</span>
-                            )}
-                            <span className="text-[10px] text-blue-500 font-bold mt-2 inline-block">
-                                {pendingMilestones.length > 0 ? 'Ver hoja de ruta →' : 'Crear hito →'}
-                            </span>
-                        </button>
-
-                        {/* 5. Tareas Atrasadas */}
+                        {/* Tareas Atrasadas Banner */}
                         {overdueTasks.length > 0 && (
                             <button
                                 onClick={() => {
                                     setListCustomView('due_date');
                                     setActiveTab('listas');
                                 }}
-                                className="bg-red-50 dark:bg-red-950/20 p-3.5 rounded-2xl border border-red-100 dark:border-red-900/30 shadow-xs text-left active:scale-[0.98] transition-all col-span-2 flex items-center justify-between"
+                                className="bg-red-50 dark:bg-red-950/20 p-3.5 rounded-2xl border border-red-100 dark:border-red-900/30 shadow-xs text-left active:scale-[0.98] transition-all sm:col-span-2 flex items-center justify-between"
                             >
                                 <div>
                                     <span className="text-[10px] font-bold text-red-600 dark:text-red-400 uppercase tracking-wider block">Atrasadas</span>
-                                    <span className="text-sm font-black text-red-700 dark:text-red-300 block mt-0.5">
+                                    <span className="text-xs font-black text-red-700 dark:text-red-300 block mt-0.5">
                                         {overdueTasks.length} tareas requieren atención
                                     </span>
                                 </div>
@@ -9053,140 +8995,224 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                 </div>
             )}
 
-            {/* BANDEJA DE NOVEDADES Y ANUNCIOS MODAL */}
+            {/* BANDEJA MODAL */}
             <Modal
                 isOpen={inboxModalOpen}
                 onClose={() => setInboxModalOpen(false)}
-                title="Bandeja de Novedades y Anuncios del Proyecto"
+                title="Bandeja"
             >
-                <div className="space-y-6">
-                    {/* Create Announcement Form */}
-                    <form
-                        onSubmit={(e) => {
-                            e.preventDefault();
-                            if (!activeProject || !inboxFormTitle.trim() || !inboxFormText.trim()) return;
-
-                            const newAnnouncement = {
-                                id: `ann-${Date.now()}`,
-                                project_id: activeProject.id,
-                                title: inboxFormTitle.trim(),
-                                text: inboxFormText.trim(),
-                                type: inboxFormType,
-                                priority: inboxFormPriority,
-                                author_name: currentUserEmail.split('@')[0],
-                                created_by: currentUserEmail,
-                                created_at: new Date().toISOString()
-                            };
-
-                            const currentInbox = activeProject.inbox || [];
-                            const updatedInbox = [newAnnouncement, ...currentInbox];
-                            onUpdateProject(activeProject.id, { inbox: updatedInbox });
-
-                            setInboxFormTitle('');
-                            setInboxFormText('');
-                            setInboxFormType('announcement');
-                            setInboxFormPriority('normal');
-                        }}
-                        className="p-4 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-gray-800 rounded-xl space-y-3.5"
-                    >
-                        <h4 className="text-xs font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
-                            <Plus className="w-3.5 h-3.5 text-blue-500" /> Publicar Nuevo Anuncio o Novedad
-                        </h4>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                            <div className="sm:col-span-2">
-                                <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">Título</label>
-                                <input
-                                    type="text"
-                                    required
-                                    placeholder="Ej: Lanzamiento de la versión v2.0 programado"
-                                    value={inboxFormTitle}
-                                    onChange={e => setInboxFormTitle(e.target.value)}
-                                    className="w-full bg-white dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-1.5 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">Tipo</label>
-                                <select
-                                    value={inboxFormType}
-                                    onChange={e => setInboxFormType(e.target.value as any)}
-                                    className="w-full bg-white dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-1.5 text-xs text-gray-900 dark:text-white font-medium"
-                                >
-                                    <option value="announcement">Anuncio</option>
-                                    <option value="idea">Idea</option>
-                                    <option value="alert">Alerta</option>
-                                    <option value="note">Nota</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div>
-                            <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">Contenido / Mensaje</label>
-                            <textarea
-                                rows={3}
-                                required
-                                placeholder="Escribe el detalle del comunicado para que aparezca en el resumen del proyecto..."
-                                value={inboxFormText}
-                                onChange={e => setInboxFormText(e.target.value)}
-                                className="w-full bg-white dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-blue-500 leading-relaxed"
+                <div className="space-y-4 font-sans">
+                    {/* Header Action Bar with Filter Search and Add Announcement Button */}
+                    <div className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center justify-between pb-2 border-b border-gray-100 dark:border-gray-800">
+                        <div className="relative flex-1">
+                            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                            <input
+                                type="text"
+                                placeholder="Filtrar anuncios..."
+                                value={bBandejaFilterSearch}
+                                onChange={e => setBBandejaFilterSearch(e.target.value)}
+                                className="w-full bg-gray-100 dark:bg-zinc-900 border-none rounded-xl pl-9 pr-3 py-1.5 text-xs text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
                             />
                         </div>
+                        <button
+                            type="button"
+                            onClick={() => setBBandejaShowAddDrawer(!bBandejaShowAddDrawer)}
+                            className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 shrink-0"
+                        >
+                            <Plus className="w-3.5 h-3.5" /> Añadir anuncio
+                        </button>
+                    </div>
 
-                        <div className="flex justify-end">
+                    {/* Filter Pills */}
+                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                        {[
+                            { id: 'all', label: 'Todos' },
+                            { id: 'announcement', label: 'Anuncios' },
+                            { id: 'idea', label: 'Ideas' },
+                            { id: 'alert', label: 'Alertas' },
+                            { id: 'note', label: 'Notas' }
+                        ].map(pill => (
                             <button
-                                type="submit"
-                                className="px-4 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-xs flex items-center gap-1.5"
+                                key={pill.id}
+                                type="button"
+                                onClick={() => setBBandejaFilterType(pill.id)}
+                                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold whitespace-nowrap transition-colors ${
+                                    bBandejaFilterType === pill.id
+                                        ? 'bg-gray-900 dark:bg-white text-white dark:text-black'
+                                        : 'bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700'
+                                }`}
                             >
-                                <Send className="w-3.5 h-3.5" /> Publicar en Resumen
+                                {pill.label}
                             </button>
-                        </div>
-                    </form>
+                        ))}
+                    </div>
 
-                    {/* Existing Announcements List */}
-                    <div className="space-y-3">
-                        <h4 className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider flex items-center justify-between">
-                            <span>Anuncios Publicados ({activeProject?.inbox?.length || 0})</span>
-                        </h4>
+                    {/* Bottom Drawer Form for New Announcement */}
+                    <AnimatePresence>
+                        {bBandejaShowAddDrawer && (
+                            <motion.form
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                exit={{ opacity: 0, height: 0 }}
+                                transition={{ duration: 0.2 }}
+                                onSubmit={(e) => {
+                                    e.preventDefault();
+                                    if (!activeProject || !inboxFormTitle.trim() || !inboxFormText.trim()) return;
 
-                        {(!activeProject?.inbox || activeProject.inbox.length === 0) ? (
-                            <p className="text-xs text-gray-400 italic py-6 text-center border border-dashed border-gray-200 dark:border-gray-800 rounded-xl">
-                                No hay anuncios publicados aún. Usa el formulario de arriba para crear uno.
-                            </p>
-                        ) : (
-                            <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
-                                {activeProject.inbox.map(item => (
-                                    <div key={item.id} className="p-3 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-gray-800 rounded-xl flex items-start justify-between gap-3 text-xs shadow-2xs">
-                                        <div className="space-y-1 min-w-0 flex-1">
-                                            <div className="flex items-center gap-2">
-                                                <span className="font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
-                                                    {item.type === 'announcement' ? <Megaphone className="w-3.5 h-3.5 text-blue-500" /> :
-                                                     item.type === 'alert' ? <AlertCircle className="w-3.5 h-3.5 text-red-500" /> :
-                                                     item.type === 'idea' ? <Sparkles className="w-3.5 h-3.5 text-amber-500" /> :
-                                                     <FileText className="w-3.5 h-3.5 text-gray-400" />}
-                                                    {item.title}
-                                                </span>
-                                                <span className="text-[10px] text-gray-400 font-mono">
-                                                    {item.created_at ? format(parseISO(item.created_at), 'd MMM, HH:mm', { locale: es }) : ''}
-                                                </span>
-                                            </div>
-                                            <p className="text-xs text-gray-600 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">{item.text}</p>
-                                            <p className="text-[10px] text-gray-400">Por {item.author_name || item.created_by?.split('@')[0]}</p>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                const updated = (activeProject.inbox || []).filter(i => i.id !== item.id);
-                                                onUpdateProject(activeProject.id, { inbox: updated });
-                                            }}
-                                            className="p-1 text-gray-400 hover:text-red-500 rounded transition-colors"
-                                            title="Eliminar anuncio"
-                                        >
-                                            <Trash2 className="w-3.5 h-3.5" />
-                                        </button>
+                                    const newAnnouncement = {
+                                        id: `ann-${Date.now()}`,
+                                        project_id: activeProject.id,
+                                        title: inboxFormTitle.trim(),
+                                        text: inboxFormText.trim(),
+                                        type: inboxFormType,
+                                        priority: inboxFormPriority,
+                                        author_name: currentUserEmail.split('@')[0],
+                                        created_by: currentUserEmail,
+                                        created_at: new Date().toISOString()
+                                    };
+
+                                    const currentInbox = activeProject.inbox || [];
+                                    const updatedInbox = [newAnnouncement, ...currentInbox];
+                                    onUpdateProject(activeProject.id, { inbox: updatedInbox });
+
+                                    setInboxFormTitle('');
+                                    setInboxFormText('');
+                                    setInboxFormType('announcement');
+                                    setInboxFormPriority('normal');
+                                    setBBandejaShowAddDrawer(false);
+                                }}
+                                className="p-4 bg-gray-50 dark:bg-zinc-900/90 border border-blue-200 dark:border-blue-900/40 rounded-2xl space-y-3 shadow-inner"
+                            >
+                                <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-800 pb-2">
+                                    <h4 className="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
+                                        <Megaphone className="w-3.5 h-3.5 text-blue-500" /> Crear Nuevo Anuncio
+                                    </h4>
+                                    <button
+                                        type="button"
+                                        onClick={() => setBBandejaShowAddDrawer(false)}
+                                        className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xs"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                                    <div className="sm:col-span-2">
+                                        <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Título</label>
+                                        <input
+                                            type="text"
+                                            required
+                                            placeholder="Ej: Anuncio de nueva versión"
+                                            value={inboxFormTitle}
+                                            onChange={e => setInboxFormTitle(e.target.value)}
+                                            className="w-full bg-white dark:bg-black border border-gray-300 dark:border-gray-700 rounded-xl px-3 py-1.5 text-xs text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                        />
                                     </div>
-                                ))}
-                            </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Tipo</label>
+                                        <select
+                                            value={inboxFormType}
+                                            onChange={e => setInboxFormType(e.target.value as any)}
+                                            className="w-full bg-white dark:bg-black border border-gray-300 dark:border-gray-700 rounded-xl px-3 py-1.5 text-xs text-gray-900 dark:text-white font-medium"
+                                        >
+                                            <option value="announcement">Anuncio</option>
+                                            <option value="idea">Idea</option>
+                                            <option value="alert">Alerta</option>
+                                            <option value="note">Nota</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Mensaje / Detalle</label>
+                                    <textarea
+                                        rows={3}
+                                        required
+                                        placeholder="Escribe el mensaje o detalle del anuncio..."
+                                        value={inboxFormText}
+                                        onChange={e => setInboxFormText(e.target.value)}
+                                        className="w-full bg-white dark:bg-black border border-gray-300 dark:border-gray-700 rounded-xl px-3 py-2 text-xs text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 leading-relaxed"
+                                    />
+                                </div>
+
+                                <div className="flex justify-end gap-2 pt-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => setBBandejaShowAddDrawer(false)}
+                                        className="px-3 py-1.5 text-xs font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-800 rounded-xl"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="px-4 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-xs flex items-center gap-1.5"
+                                    >
+                                        <Send className="w-3.5 h-3.5" /> Publicar
+                                    </button>
+                                </div>
+                            </motion.form>
                         )}
+                    </AnimatePresence>
+
+                    {/* Existing Published Announcements List */}
+                    <div className="space-y-2.5">
+                        {(() => {
+                            const rawInbox = activeProject?.inbox || [];
+                            const filteredInbox = rawInbox.filter(item => {
+                                if (bBandejaFilterType !== 'all' && item.type !== bBandejaFilterType) return false;
+                                if (bBandejaFilterSearch.trim()) {
+                                    const search = bBandejaFilterSearch.toLowerCase();
+                                    const titleMatch = (item.title || '').toLowerCase().includes(search);
+                                    const textMatch = (item.text || '').toLowerCase().includes(search);
+                                    if (!titleMatch && !textMatch) return false;
+                                }
+                                return true;
+                            });
+
+                            if (filteredInbox.length === 0) {
+                                return (
+                                    <p className="text-xs text-gray-400 italic py-8 text-center border border-dashed border-gray-200 dark:border-gray-800 rounded-2xl">
+                                        No hay anuncios publicados {bBandejaFilterSearch ? 'que coincidan con el filtro' : 'aún'}.
+                                    </p>
+                                );
+                            }
+
+                            return (
+                                <div className="space-y-2 max-h-72 overflow-y-auto pr-1 custom-scrollbar">
+                                    {filteredInbox.map(item => (
+                                        <div key={item.id} className="p-3.5 bg-white dark:bg-zinc-900 border border-gray-200/80 dark:border-gray-800/80 rounded-2xl flex items-start justify-between gap-3 text-xs shadow-2xs">
+                                            <div className="space-y-1 min-w-0 flex-1">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
+                                                        {item.type === 'announcement' ? <Megaphone className="w-3.5 h-3.5 text-blue-500" /> :
+                                                         item.type === 'alert' ? <AlertCircle className="w-3.5 h-3.5 text-red-500" /> :
+                                                         item.type === 'idea' ? <Sparkles className="w-3.5 h-3.5 text-amber-500" /> :
+                                                         <FileText className="w-3.5 h-3.5 text-gray-400" />}
+                                                        {item.title}
+                                                    </span>
+                                                    <span className="text-[10px] text-gray-400 font-mono">
+                                                        {item.created_at ? format(parseISO(item.created_at), 'd MMM, HH:mm', { locale: es }) : ''}
+                                                    </span>
+                                                </div>
+                                                <p className="text-xs text-gray-600 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">{item.text}</p>
+                                                <p className="text-[10px] text-gray-400">Por {item.author_name || item.created_by?.split('@')[0]}</p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const updated = (activeProject.inbox || []).filter(i => i.id !== item.id);
+                                                    onUpdateProject(activeProject.id, { inbox: updated });
+                                                }}
+                                                className="p-1 text-gray-400 hover:text-red-500 rounded-lg transition-colors"
+                                                title="Eliminar anuncio"
+                                            >
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            );
+                        })()}
                     </div>
                 </div>
             </Modal>

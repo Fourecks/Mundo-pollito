@@ -1824,10 +1824,18 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
     // Local UI state for Mobile
     const [activeTab, setActiveTab] = useState('home');
     const [studentMobileTab, setStudentMobileTab] = useState<'resumen' | 'materias' | 'mas'>('resumen');
-    const [financeMobileTab, setFinanceMobileTab] = useState<string>('summary');
-    const [projectsMobileTab, setProjectsMobileTab] = useState<string>('projects_list');
+    const [financeMobileTab, setFinanceMobileTab] = useState<string>('overview');
+    const [projectsMobileTab, setProjectsMobileTab] = useState<string>('overview');
     const [notesMobileTab, setNotesMobileTab] = useState<string>('notes_all');
-    const [habitsMobileTab, setHabitsMobileTab] = useState<string>('habits_today');
+    const [habitsMobileTab, setHabitsMobileTab] = useState<string>('hoy');
+
+    useEffect(() => {
+      if (activeTab === 'student') setStudentMobileTab('resumen');
+      if (activeTab === 'finance') setFinanceMobileTab('overview');
+      if (activeTab === 'projects') setProjectsMobileTab('overview');
+      if (activeTab === 'habits') setHabitsMobileTab('hoy');
+      if (activeTab === 'notes') setNotesMobileTab('notes_all');
+    }, [activeTab]);
     const [activeNoteForNotes, setActiveNoteForNotes] = useState<number | null>(null);
     const [activeFolderForNotes, setActiveFolderForNotes] = useState<number | null>(null);
 

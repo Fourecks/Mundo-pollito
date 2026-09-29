@@ -5986,7 +5986,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({
             </div>
           ) : (
             <>
-              {isMobile ? renderMobileTopNav() : renderTabs()}
+              {!isMobile && renderTabs()}
 
               {overdueItems.length > 0 && (
                 <button
