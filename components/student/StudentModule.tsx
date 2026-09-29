@@ -34,7 +34,8 @@ const ScheduleView: React.FC<{
   onDeleteScheduleSlot: (id: string) => void;
   onSelectSubject: (subject: Subject) => void;
   onAddSubjectClick: () => void;
-}> = ({ subjects, schedules, onAddScheduleSlot, onDeleteScheduleSlot, onSelectSubject, onAddSubjectClick }) => {
+  onBack?: () => void;
+}> = ({ subjects, schedules, onAddScheduleSlot, onDeleteScheduleSlot, onSelectSubject, onAddSubjectClick, onBack }) => {
   const daysOfWeek = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
   
   const todayIndex = new Date().getDay();
@@ -75,18 +76,25 @@ const ScheduleView: React.FC<{
 
   return (
     <div className="space-y-4">
-      {/* Header Minimalista */}
+      {/* Header Minimalista Con Botón de Regresar si aplica */}
       <div className="flex items-center justify-between gap-2 pb-2 border-b border-gray-100 dark:border-white/5">
-        <div className="flex items-center gap-2">
-          <h3 className="text-base font-bold text-gray-900 dark:text-white tracking-tight">
+        <div className="flex items-center gap-2 min-w-0">
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="flex items-center gap-1 text-xs font-semibold text-gray-900 dark:text-white hover:opacity-80 transition-opacity cursor-pointer shrink-0 mr-1"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              <span>Más</span>
+            </button>
+          )}
+          <h3 className="text-base font-bold text-gray-900 dark:text-white tracking-tight truncate">
             Horario
           </h3>
-          <span className="text-xs font-medium text-gray-400">
-            · {schedules.length} {schedules.length === 1 ? 'clase' : 'clases'}
-          </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           {/* Selector de Vista Día / Semana */}
           <div className="flex items-center p-0.5 bg-gray-100 dark:bg-white/5 rounded-lg text-[11px] font-medium">
             <button
@@ -851,8 +859,8 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
               </button>
             </div>
           </>
-        ) : (
-          /* Header when inside a sub-screen from "Más" */
+        ) : masSubScreen !== 'schedule' ? (
+          /* Header when inside a sub-screen from "Más" (except schedule which has its integrated bar) */
           <div className="flex items-center justify-between py-1">
             <button
               type="button"
@@ -892,7 +900,7 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
               )}
             </div>
           </div>
-        )}
+        ) : null}
       </div>
 
       {/* Main Content Area */}
@@ -1220,6 +1228,7 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
                   onDeleteScheduleSlot={handleDeleteScheduleSlot}
                   onSelectSubject={(subj) => setActiveSubject(subj)} 
                   onAddSubjectClick={() => setIsAddingSubject(true)} 
+                  onBack={() => setMasSubScreen(null)}
                 />
               )}
 
