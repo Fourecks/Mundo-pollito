@@ -2028,55 +2028,46 @@ export const SubjectWorkspace: React.FC<Props> = ({
             const usedWeight = categories.reduce((sum, c) => sum + (c.weight || 0), 0);
 
             return (
-              <div className="space-y-4">
-                {/* Resumen Minimalista */}
-                <div className="bg-white dark:bg-[#151515] p-5 rounded-3xl border border-gray-150/70 dark:border-white/5 shadow-2xs space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-100 dark:border-white/5">
-                    <div>
-                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-gray-400 block mb-1">
-                        Promedio del Curso
+              <div className="space-y-6">
+                {/* Resumen integrado directamente en el fondo */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-150 dark:border-white/10">
+                  <div>
+                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-gray-400 block mb-1">
+                      Promedio del Curso
+                    </span>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-3xl font-extrabold text-gray-900 dark:text-white">
+                        {summary.currentAverage !== null ? summary.currentAverage.toFixed(1) : 'S/N'}
                       </span>
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-3xl font-extrabold text-gray-900 dark:text-white">
-                          {summary.currentAverage !== null ? summary.currentAverage.toFixed(1) : 'S/N'}
-                        </span>
-                        <span className="text-xs text-gray-400 font-medium">/ {summary.gradeScale}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <div className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white text-xs font-bold border border-gray-200 dark:border-white/10">
+                      <span className="text-xs text-gray-400 font-medium">/ {summary.gradeScale}</span>
+                      <span className="ml-2 px-2.5 py-0.5 rounded-full bg-gray-100 dark:bg-white/10 text-gray-800 dark:text-gray-200 text-xs font-semibold">
                         {summary.evaluatedPercentage}% Evaluado
-                      </div>
-                      <button
-                        onClick={() => setIsAddingCategory(true)}
-                        className="px-3.5 py-1.5 bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/15 text-gray-800 dark:text-white rounded-xl text-xs font-bold transition-colors cursor-pointer border border-gray-200 dark:border-white/10"
-                      >
-                        + Categoría
-                      </button>
-                      <button
-                        onClick={() => setIsAddingGrade(true)}
-                        className="px-3.5 py-1.5 bg-black dark:bg-white text-white dark:text-black rounded-xl text-xs font-bold transition-opacity hover:opacity-90 shadow-2xs cursor-pointer"
-                      >
-                        + Evaluación
-                      </button>
+                      </span>
                     </div>
                   </div>
 
-                  {summary.targetProjection && (
-                    <div className="p-3 rounded-2xl text-xs font-medium flex items-center gap-2 bg-gray-50 dark:bg-white/5 text-gray-700 dark:text-gray-300 border border-gray-150/60 dark:border-white/5">
-                      <Target className="w-3.5 h-3.5 shrink-0 text-gray-900 dark:text-white" />
-                      <p className="leading-snug">{summary.targetProjection.message}</p>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setIsAddingCategory(true)}
+                      className="px-3.5 py-1.5 bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/15 text-gray-800 dark:text-white rounded-xl text-xs font-bold transition-colors cursor-pointer border border-gray-200 dark:border-white/10"
+                    >
+                      + Categoría
+                    </button>
+                    <button
+                      onClick={() => setIsAddingGrade(true)}
+                      className="px-3.5 py-1.5 bg-black dark:bg-white text-white dark:text-black rounded-xl text-xs font-bold transition-opacity hover:opacity-90 cursor-pointer"
+                    >
+                      + Evaluación
+                    </button>
+                  </div>
                 </div>
 
-                {/* Categorías y Ponderaciones Minimalistas */}
-                <div className="bg-white dark:bg-[#151515] p-5 rounded-3xl border border-gray-150/70 dark:border-white/5 shadow-2xs space-y-3">
+                {/* Categorías y Ponderaciones Integradas */}
+                <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <div>
-                      <h4 className="text-xs font-extrabold uppercase tracking-wider text-gray-400">Ponderaciones ({usedWeight}% / 100%)</h4>
-                    </div>
+                    <h4 className="text-xs font-extrabold uppercase tracking-wider text-gray-400">
+                      Ponderaciones ({usedWeight}% / 100%)
+                    </h4>
                     <button
                       onClick={() => setIsAddingCategory(true)}
                       className="text-xs font-bold text-gray-900 dark:text-white hover:underline cursor-pointer"
@@ -2086,24 +2077,30 @@ export const SubjectWorkspace: React.FC<Props> = ({
                   </div>
 
                   {categories.length === 0 ? (
-                    <p className="text-xs text-gray-400 py-2 text-center">Sin categorías configuradas (ej. Parciales 40%, Tareas 30%, Final 30%).</p>
+                    <p className="text-xs text-gray-400 py-1">Sin categorías configuradas (ej. Parciales 40%, Tareas 30%, Final 30%).</p>
                   ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                    <div className="flex flex-wrap gap-2 pt-0.5">
                       {categories.map(cat => {
                         const catSummary = summary.categorySummaries.find(cs => cs.category.id === cat.id);
                         return (
-                          <div key={cat.id} className="p-3 rounded-2xl bg-gray-50 dark:bg-[#16141f] border border-gray-150/70 dark:border-white/5 flex items-center justify-between">
+                          <div
+                            key={cat.id}
+                            className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/50 dark:bg-white/5 transition-colors"
+                          >
                             <div>
-                              <span className="font-bold text-xs text-gray-900 dark:text-white block">{cat.name}</span>
-                              <span className="text-[10px] text-gray-400">Peso: {cat.weight}%</span>
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-bold text-xs text-gray-900 dark:text-white">{cat.name}</span>
+                                <span className="text-[10px] text-gray-400 font-mono font-medium">({cat.weight}%)</span>
+                              </div>
                             </div>
-                            <div className="flex items-center gap-2.5">
+                            <div className="flex items-center gap-2 pl-2 border-l border-gray-200 dark:border-white/10">
                               <span className="text-xs font-extrabold text-gray-900 dark:text-white">
-                                {catSummary?.average !== null && catSummary?.average !== undefined ? catSummary.average.toFixed(1) : 'S/N'}
+                                {catSummary?.average !== null && catSummary?.average !== undefined ? catSummary.average.toFixed(1) : '—'}
                               </span>
                               <button
                                 onClick={() => handleDeleteCategory(cat.id)}
-                                className="text-gray-400 hover:text-red-500 p-1 cursor-pointer"
+                                className="text-gray-400 hover:text-red-500 p-0.5 cursor-pointer"
+                                title="Eliminar categoría"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
@@ -2115,10 +2112,12 @@ export const SubjectWorkspace: React.FC<Props> = ({
                   )}
                 </div>
 
-                {/* Registro de Evaluaciones Minimalista */}
-                <div className="bg-white dark:bg-[#151515] p-5 rounded-3xl border border-gray-150/70 dark:border-white/5 shadow-2xs space-y-3">
-                  <div className="flex justify-between items-center">
-                    <h4 className="text-xs font-extrabold uppercase tracking-wider text-gray-400">Historial de Calificaciones ({grades.length})</h4>
+                {/* Registro de Evaluaciones Integrado */}
+                <div className="space-y-3 pt-2">
+                  <div className="flex justify-between items-center pb-2 border-b border-gray-150 dark:border-white/10">
+                    <h4 className="text-xs font-extrabold uppercase tracking-wider text-gray-400">
+                      Historial de Evaluaciones ({grades.length})
+                    </h4>
                     <button
                       onClick={() => setIsAddingGrade(true)}
                       className="text-xs font-bold text-gray-900 dark:text-white hover:underline cursor-pointer"
@@ -2128,32 +2127,32 @@ export const SubjectWorkspace: React.FC<Props> = ({
                   </div>
 
                   {grades.length === 0 ? (
-                    <p className="text-xs text-gray-400 py-4 text-center">No hay calificaciones registradas aún en esta materia.</p>
+                    <p className="text-xs text-gray-400 py-6 text-center">No hay calificaciones registradas aún en esta materia.</p>
                   ) : (
-                    <div className="space-y-2">
+                    <div className="divide-y divide-gray-150 dark:divide-white/10">
                       {grades.map(grade => {
                         const cat = categories.find(c => c.id === grade.category_id);
                         const isPending = grade.score === null || grade.status === 'pending';
                         return (
-                          <div key={grade.id} className="p-3.5 rounded-2xl bg-gray-50 dark:bg-[#16141f] border border-gray-150/70 dark:border-white/5 flex items-center justify-between gap-3 group">
+                          <div key={grade.id} className="py-3 flex items-center justify-between gap-3 group">
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-bold text-xs text-gray-900 dark:text-white truncate">{grade.name}</span>
+                                <span className="font-bold text-sm text-gray-900 dark:text-white truncate">{grade.name}</span>
                                 {cat && (
-                                  <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-white dark:bg-white/10 text-gray-900 dark:text-white border border-gray-200 dark:border-white/10 shrink-0">
+                                  <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-white/10 shrink-0">
                                     {cat.name} ({cat.weight}%)
                                   </span>
                                 )}
                               </div>
-                              <div className="flex items-center gap-2 text-[10px] text-gray-400 mt-0.5">
+                              <div className="flex items-center gap-2 text-[11px] text-gray-400 mt-0.5">
                                 {grade.date && <span>📅 {grade.date}</span>}
                                 {grade.notes && <span className="truncate">• {grade.notes}</span>}
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-2.5 shrink-0">
+                            <div className="flex items-center gap-3 shrink-0">
                               {isPending ? (
-                                <span className="px-2.5 py-1 rounded-xl text-xs font-semibold bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300 border border-gray-200 dark:border-white/10">
+                                <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300 border border-gray-200 dark:border-white/10">
                                   ⏳ Pendiente
                                 </span>
                               ) : (
@@ -2166,6 +2165,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                               <button
                                 onClick={() => handleDeleteGrade(grade.id)}
                                 className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 p-1 cursor-pointer transition-opacity"
+                                title="Eliminar evaluación"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
@@ -2175,25 +2175,6 @@ export const SubjectWorkspace: React.FC<Props> = ({
                       })}
                     </div>
                   )}
-                </div>
-
-                {/* Asistencia de Hoy */}
-                <div className="bg-white dark:bg-[#151515] p-5 rounded-3xl border border-gray-150/70 dark:border-white/5 shadow-2xs space-y-3">
-                  <div className="flex justify-between items-center">
-                    <h4 className="text-xs font-extrabold uppercase tracking-wider text-gray-400">Asistencia de Hoy</h4>
-                    <span className="text-xs font-mono text-gray-400">{new Date().toLocaleDateString()}</span>
-                  </div>
-                  <div className="flex gap-2">
-                    <button onClick={() => handleRecordAttendance('present')} className="flex-1 py-2 bg-gray-100 text-gray-900 dark:bg-white/10 dark:text-white rounded-xl text-xs font-bold hover:opacity-90 transition-colors border border-gray-200 dark:border-white/10 cursor-pointer">
-                      Presente
-                    </button>
-                    <button onClick={() => handleRecordAttendance('absent')} className="flex-1 py-2 bg-gray-50 text-gray-600 dark:bg-white/5 dark:text-gray-400 rounded-xl text-xs font-bold hover:opacity-90 transition-colors border border-gray-200 dark:border-white/10 cursor-pointer">
-                      Ausente
-                    </button>
-                    <button onClick={() => handleRecordAttendance('excused')} className="flex-1 py-2 bg-gray-50 text-gray-600 dark:bg-white/5 dark:text-gray-400 rounded-xl text-xs font-bold hover:opacity-90 transition-colors border border-gray-200 dark:border-white/10 cursor-pointer">
-                      Justificado
-                    </button>
-                  </div>
                 </div>
               </div>
             );
