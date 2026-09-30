@@ -39,10 +39,11 @@ export const SubjectWorkspace: React.FC<Props> = ({
   onUpdateNote = async () => {},
   onDeleteNote = async () => {},
 }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'units' | 'notes' | 'tasks' | 'exams' | 'resources' | 'projects' | 'study' | 'grades' | 'flashcards'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'units' | 'notes' | 'tasks' | 'exams' | 'resources' | 'projects' | 'grades'>('overview');
+  const [tasksSubTab, setTasksSubTab] = useState<'tasks' | 'sessions'>('tasks');
   
   // Mobile Navigation & View States
-  const [mobileSubView, setMobileSubView] = useState<'main' | 'units' | 'notes' | 'tasks' | 'exams' | 'resources' | 'projects' | 'grades' | 'study' | 'flashcards'>('main');
+  const [mobileSubView, setMobileSubView] = useState<'main' | 'units' | 'notes' | 'tasks' | 'exams' | 'resources' | 'projects' | 'grades'>('main');
   const [activeUnit, setActiveUnit] = useState<Unit | null>(null);
   const [showMobileActionSheet, setShowMobileActionSheet] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -860,7 +861,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
 
       {/* DESKTOP TABS */}
       <div className="hidden md:flex px-8 pt-4 border-b border-gray-100 dark:border-white/5 gap-6 overflow-x-auto shrink-0 bg-white dark:bg-[#111]">
-        {(['overview', 'units', 'notes', 'tasks', 'exams', 'study', 'grades', 'flashcards'] as const).map(tab => (
+        {(['overview', 'units', 'tasks', 'exams', 'notes', 'grades', 'projects'] as const).map(tab => (
           <button 
             key={tab} 
             onClick={() => {
@@ -870,7 +871,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
             }}
             className={`pb-3 text-xs font-bold uppercase tracking-wider transition-colors relative whitespace-nowrap cursor-pointer ${activeTab === tab ? 'text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
           >
-            {tab === 'notes' ? 'Notas' : tab === 'study' ? 'Sesiones' : tab === 'grades' ? 'Calificaciones' : tab === 'flashcards' ? 'Flashcards' : tab === 'overview' ? 'Resumen' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+            {tab === 'notes' ? 'Apuntes' : tab === 'exams' ? 'Evaluaciones' : tab === 'grades' ? 'Calificaciones' : tab === 'overview' ? 'Resumen' : tab === 'units' ? 'Unidades' : tab === 'tasks' ? 'Tareas' : tab === 'projects' ? 'Proyectos' : tab}
             {activeTab === tab && (
               <motion.div layoutId="subject-tab" className="absolute bottom-0 left-0 right-0 h-0.5 rounded-t-full bg-black dark:bg-white" />
             )}
@@ -1006,35 +1007,31 @@ export const SubjectWorkspace: React.FC<Props> = ({
                 </div>
               ) : null}
 
-              {/* CONTENIDO ACADÉMICO */}
+              {/* CONTENIDO ACADÉMICO - 2 COLUMNAS */}
               <div className="space-y-3 pt-1">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                  Módulos y Actividades
-                </h3>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                <div className="grid grid-cols-2 gap-3 sm:gap-4">
                   {/* Unidades Block */}
                   <button
                     onClick={() => { setActiveTab('units'); setMobileSubView('units'); }}
-                    className="p-5 sm:p-6 bg-white dark:bg-[#16141f] rounded-3xl border border-gray-150/80 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20 shadow-xs hover:shadow-md transition-all text-left flex flex-col justify-between group cursor-pointer active:scale-[0.98] min-h-[140px]"
+                    className="p-4 sm:p-5 bg-white dark:bg-[#16141f] rounded-2xl sm:rounded-3xl border border-gray-150/80 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20 shadow-2xs hover:shadow-sm transition-all text-left flex flex-col justify-between group cursor-pointer active:scale-[0.98] min-h-[125px]"
                   >
                     <div className="flex items-center justify-between w-full">
                       <div 
-                        className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0"
+                        className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0"
                         style={{ backgroundColor: `${subject.color || '#0d9488'}20`, color: subject.color || '#0d9488' }}
                       >
-                        <FolderKanban className="w-5 h-5" />
+                        <FolderKanban className="w-4 h-4 sm:w-5 sm:h-5" />
                       </div>
-                      <div className="w-7 h-7 rounded-full bg-gray-100 dark:bg-white/10 text-gray-400 group-hover:text-black dark:group-hover:text-white flex items-center justify-center transition-colors">
-                        <ChevronRight className="w-4 h-4" />
+                      <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-gray-100 dark:bg-white/10 text-gray-400 group-hover:text-black dark:group-hover:text-white flex items-center justify-center transition-colors">
+                        <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       </div>
                     </div>
-                    <div className="mt-3">
-                      <h4 className="text-base font-bold text-gray-900 dark:text-white block group-hover:text-blue-500 transition-colors">
-                        Unidades & Temas
+                    <div className="mt-2.5">
+                      <h4 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white block group-hover:text-blue-500 transition-colors">
+                        Unidades
                       </h4>
-                      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mt-0.5">
-                        {units.length === 0 ? 'Sin iniciar' : `${units.length} unidades · ${units.filter(u => u.status === 'completed').length} completadas`}
+                      <p className="text-[11px] sm:text-xs font-semibold text-gray-500 dark:text-gray-400 mt-0.5">
+                        {units.length === 0 ? 'Sin unidades' : `${units.length} ${units.length === 1 ? 'unidad' : 'unidades'}`}
                       </p>
                     </div>
                   </button>
@@ -1042,49 +1039,49 @@ export const SubjectWorkspace: React.FC<Props> = ({
                   {/* Tareas Block */}
                   <button
                     onClick={() => { setActiveTab('tasks'); setMobileSubView('tasks'); }}
-                    className="p-5 sm:p-6 bg-white dark:bg-[#16141f] rounded-3xl border border-gray-150/80 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20 shadow-xs hover:shadow-md transition-all text-left flex flex-col justify-between group cursor-pointer active:scale-[0.98] min-h-[140px]"
+                    className="p-4 sm:p-5 bg-white dark:bg-[#16141f] rounded-2xl sm:rounded-3xl border border-gray-150/80 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20 shadow-2xs hover:shadow-sm transition-all text-left flex flex-col justify-between group cursor-pointer active:scale-[0.98] min-h-[125px]"
                   >
                     <div className="flex items-center justify-between w-full">
                       <div 
-                        className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 bg-blue-500/15 text-blue-500"
+                        className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 bg-blue-500/15 text-blue-500"
                       >
-                        <CheckSquare className="w-5 h-5" />
+                        <CheckSquare className="w-4 h-4 sm:w-5 sm:h-5" />
                       </div>
-                      <div className="w-7 h-7 rounded-full bg-gray-100 dark:bg-white/10 text-gray-400 group-hover:text-black dark:group-hover:text-white flex items-center justify-center transition-colors">
-                        <ChevronRight className="w-4 h-4" />
+                      <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-gray-100 dark:bg-white/10 text-gray-400 group-hover:text-black dark:group-hover:text-white flex items-center justify-center transition-colors">
+                        <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       </div>
                     </div>
-                    <div className="mt-3">
-                      <h4 className="text-base font-bold text-gray-900 dark:text-white block group-hover:text-blue-500 transition-colors">
-                        Tareas & Entregas
+                    <div className="mt-2.5">
+                      <h4 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white block group-hover:text-blue-500 transition-colors">
+                        Tareas
                       </h4>
-                      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mt-0.5">
-                        {tasks.filter(t => !t.completed).length === 1 ? '1 tarea pendiente' : `${tasks.filter(t => !t.completed).length} tareas pendientes`}
+                      <p className="text-[11px] sm:text-xs font-semibold text-gray-500 dark:text-gray-400 mt-0.5">
+                        {tasks.filter(t => !t.completed).length === 1 ? '1 pendiente' : `${tasks.filter(t => !t.completed).length} pendientes`}
                       </p>
                     </div>
                   </button>
 
-                  {/* Exámenes Block */}
+                  {/* Evaluaciones Block */}
                   <button
                     onClick={() => { setActiveTab('exams'); setMobileSubView('exams'); }}
-                    className="p-5 sm:p-6 bg-white dark:bg-[#16141f] rounded-3xl border border-gray-150/80 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20 shadow-xs hover:shadow-md transition-all text-left flex flex-col justify-between group cursor-pointer active:scale-[0.98] min-h-[140px]"
+                    className="p-4 sm:p-5 bg-white dark:bg-[#16141f] rounded-2xl sm:rounded-3xl border border-gray-150/80 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20 shadow-2xs hover:shadow-sm transition-all text-left flex flex-col justify-between group cursor-pointer active:scale-[0.98] min-h-[125px]"
                   >
                     <div className="flex items-center justify-between w-full">
                       <div 
-                        className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 bg-amber-500/15 text-amber-500"
+                        className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 bg-amber-500/15 text-amber-500"
                       >
-                        <Calendar className="w-5 h-5" />
+                        <Calendar className="w-4 h-4 sm:w-5 sm:h-5" />
                       </div>
-                      <div className="w-7 h-7 rounded-full bg-gray-100 dark:bg-white/10 text-gray-400 group-hover:text-black dark:group-hover:text-white flex items-center justify-center transition-colors">
-                        <ChevronRight className="w-4 h-4" />
+                      <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-gray-100 dark:bg-white/10 text-gray-400 group-hover:text-black dark:group-hover:text-white flex items-center justify-center transition-colors">
+                        <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       </div>
                     </div>
-                    <div className="mt-3">
-                      <h4 className="text-base font-bold text-gray-900 dark:text-white block group-hover:text-blue-500 transition-colors">
-                        Exámenes & Evaluaciones
+                    <div className="mt-2.5">
+                      <h4 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white block group-hover:text-blue-500 transition-colors">
+                        Evaluaciones
                       </h4>
-                      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mt-0.5">
-                        {exams.filter(e => e.status !== 'completed').length === 1 ? '1 próximo examen' : `${exams.filter(e => e.status !== 'completed').length} exámenes programados`}
+                      <p className="text-[11px] sm:text-xs font-semibold text-gray-500 dark:text-gray-400 mt-0.5">
+                        {exams.filter(e => e.status !== 'completed').length === 1 ? '1 próxima' : `${exams.filter(e => e.status !== 'completed').length} programadas`}
                       </p>
                     </div>
                   </button>
@@ -1092,24 +1089,24 @@ export const SubjectWorkspace: React.FC<Props> = ({
                   {/* Apuntes Block */}
                   <button
                     onClick={() => { setActiveTab('notes'); setMobileSubView('notes'); }}
-                    className="p-5 sm:p-6 bg-white dark:bg-[#16141f] rounded-3xl border border-gray-150/80 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20 shadow-xs hover:shadow-md transition-all text-left flex flex-col justify-between group cursor-pointer active:scale-[0.98] min-h-[140px]"
+                    className="p-4 sm:p-5 bg-white dark:bg-[#16141f] rounded-2xl sm:rounded-3xl border border-gray-150/80 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20 shadow-2xs hover:shadow-sm transition-all text-left flex flex-col justify-between group cursor-pointer active:scale-[0.98] min-h-[125px]"
                   >
                     <div className="flex items-center justify-between w-full">
                       <div 
-                        className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 bg-purple-500/15 text-purple-500"
+                        className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 bg-purple-500/15 text-purple-500"
                       >
-                        <FileText className="w-5 h-5" />
+                        <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
                       </div>
-                      <div className="w-7 h-7 rounded-full bg-gray-100 dark:bg-white/10 text-gray-400 group-hover:text-black dark:group-hover:text-white flex items-center justify-center transition-colors">
-                        <ChevronRight className="w-4 h-4" />
+                      <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-gray-100 dark:bg-white/10 text-gray-400 group-hover:text-black dark:group-hover:text-white flex items-center justify-center transition-colors">
+                        <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       </div>
                     </div>
-                    <div className="mt-3">
-                      <h4 className="text-base font-bold text-gray-900 dark:text-white block group-hover:text-blue-500 transition-colors">
-                        Apuntes & Notas
+                    <div className="mt-2.5">
+                      <h4 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white block group-hover:text-blue-500 transition-colors">
+                        Apuntes
                       </h4>
-                      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mt-0.5">
-                        {notes.length === 1 ? '1 apunte guardado' : `${notes.length} apuntes registrados`}
+                      <p className="text-[11px] sm:text-xs font-semibold text-gray-500 dark:text-gray-400 mt-0.5">
+                        {notes.length === 1 ? '1 apunte' : `${notes.length} apuntes`}
                       </p>
                     </div>
                   </button>
@@ -1117,74 +1114,24 @@ export const SubjectWorkspace: React.FC<Props> = ({
                   {/* Calificaciones Block */}
                   <button
                     onClick={() => { setActiveTab('grades'); setMobileSubView('grades'); }}
-                    className="p-5 sm:p-6 bg-white dark:bg-[#16141f] rounded-3xl border border-gray-150/80 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20 shadow-xs hover:shadow-md transition-all text-left flex flex-col justify-between group cursor-pointer active:scale-[0.98] min-h-[140px]"
+                    className="p-4 sm:p-5 bg-white dark:bg-[#16141f] rounded-2xl sm:rounded-3xl border border-gray-150/80 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20 shadow-2xs hover:shadow-sm transition-all text-left flex flex-col justify-between group cursor-pointer active:scale-[0.98] min-h-[125px]"
                   >
                     <div className="flex items-center justify-between w-full">
                       <div 
-                        className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 bg-emerald-500/15 text-emerald-500"
+                        className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 bg-emerald-500/15 text-emerald-500"
                       >
-                        <Award className="w-5 h-5" />
+                        <Award className="w-4 h-4 sm:w-5 sm:h-5" />
                       </div>
-                      <div className="w-7 h-7 rounded-full bg-gray-100 dark:bg-white/10 text-gray-400 group-hover:text-black dark:group-hover:text-white flex items-center justify-center transition-colors">
-                        <ChevronRight className="w-4 h-4" />
+                      <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-gray-100 dark:bg-white/10 text-gray-400 group-hover:text-black dark:group-hover:text-white flex items-center justify-center transition-colors">
+                        <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       </div>
                     </div>
-                    <div className="mt-3">
-                      <h4 className="text-base font-bold text-gray-900 dark:text-white block group-hover:text-blue-500 transition-colors">
-                        Calificaciones & Promedios
+                    <div className="mt-2.5">
+                      <h4 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white block group-hover:text-blue-500 transition-colors">
+                        Calificaciones
                       </h4>
-                      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mt-0.5">
-                        {grades.length > 0 ? `Promedio actual: ${currentGrade.toFixed(1)} / ${subject.grade_scale || 10}` : 'Sin calificaciones registradas'}
-                      </p>
-                    </div>
-                  </button>
-
-                  {/* Sesiones de Estudio Block */}
-                  <button
-                    onClick={() => { setActiveTab('study'); setMobileSubView('study'); }}
-                    className="p-5 sm:p-6 bg-white dark:bg-[#16141f] rounded-3xl border border-gray-150/80 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20 shadow-xs hover:shadow-md transition-all text-left flex flex-col justify-between group cursor-pointer active:scale-[0.98] min-h-[140px]"
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <div 
-                        className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 bg-rose-500/15 text-rose-500"
-                      >
-                        <Clock className="w-5 h-5" />
-                      </div>
-                      <div className="w-7 h-7 rounded-full bg-gray-100 dark:bg-white/10 text-gray-400 group-hover:text-black dark:group-hover:text-white flex items-center justify-center transition-colors">
-                        <ChevronRight className="w-4 h-4" />
-                      </div>
-                    </div>
-                    <div className="mt-3">
-                      <h4 className="text-base font-bold text-gray-900 dark:text-white block group-hover:text-blue-500 transition-colors">
-                        Sesiones de Estudio
-                      </h4>
-                      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mt-0.5">
-                        {studySessions.length === 1 ? '1 sesión realizada' : `${studySessions.length} sesiones de estudio`}
-                      </p>
-                    </div>
-                  </button>
-
-                  {/* Flashcards Block */}
-                  <button
-                    onClick={() => { setActiveTab('flashcards'); setMobileSubView('flashcards'); }}
-                    className="p-5 sm:p-6 bg-white dark:bg-[#16141f] rounded-3xl border border-gray-150/80 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20 shadow-xs hover:shadow-md transition-all text-left flex flex-col justify-between group cursor-pointer active:scale-[0.98] min-h-[140px]"
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <div 
-                        className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 bg-indigo-500/15 text-indigo-500"
-                      >
-                        <Layers className="w-5 h-5" />
-                      </div>
-                      <div className="w-7 h-7 rounded-full bg-gray-100 dark:bg-white/10 text-gray-400 group-hover:text-black dark:group-hover:text-white flex items-center justify-center transition-colors">
-                        <ChevronRight className="w-4 h-4" />
-                      </div>
-                    </div>
-                    <div className="mt-3">
-                      <h4 className="text-base font-bold text-gray-900 dark:text-white block group-hover:text-blue-500 transition-colors">
-                        Flashcards & Mazos
-                      </h4>
-                      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mt-0.5">
-                        {decks.length === 1 ? '1 mazo disponible' : `${decks.length} mazos de repaso`}
+                      <p className="text-[11px] sm:text-xs font-semibold text-gray-500 dark:text-gray-400 mt-0.5">
+                        {grades.length > 0 ? `Promedio ${currentGrade.toFixed(1)}` : 'Sin notas'}
                       </p>
                     </div>
                   </button>
@@ -1192,24 +1139,24 @@ export const SubjectWorkspace: React.FC<Props> = ({
                   {/* Proyectos Block */}
                   <button
                     onClick={() => { setActiveTab('projects'); setMobileSubView('projects'); }}
-                    className="p-5 sm:p-6 bg-white dark:bg-[#16141f] rounded-3xl border border-gray-150/80 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20 shadow-xs hover:shadow-md transition-all text-left flex flex-col justify-between group cursor-pointer active:scale-[0.98] min-h-[140px]"
+                    className="p-4 sm:p-5 bg-white dark:bg-[#16141f] rounded-2xl sm:rounded-3xl border border-gray-150/80 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20 shadow-2xs hover:shadow-sm transition-all text-left flex flex-col justify-between group cursor-pointer active:scale-[0.98] min-h-[125px]"
                   >
                     <div className="flex items-center justify-between w-full">
                       <div 
-                        className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 bg-teal-500/15 text-teal-500"
+                        className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 bg-teal-500/15 text-teal-500"
                       >
-                        <Sparkles className="w-5 h-5" />
+                        <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
                       </div>
-                      <div className="w-7 h-7 rounded-full bg-gray-100 dark:bg-white/10 text-gray-400 group-hover:text-black dark:group-hover:text-white flex items-center justify-center transition-colors">
-                        <ChevronRight className="w-4 h-4" />
+                      <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-gray-100 dark:bg-white/10 text-gray-400 group-hover:text-black dark:group-hover:text-white flex items-center justify-center transition-colors">
+                        <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       </div>
                     </div>
-                    <div className="mt-3">
-                      <h4 className="text-base font-bold text-gray-900 dark:text-white block group-hover:text-blue-500 transition-colors">
+                    <div className="mt-2.5">
+                      <h4 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white block group-hover:text-blue-500 transition-colors">
                         Proyectos
                       </h4>
-                      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mt-0.5">
-                        {projects.length === 1 ? '1 proyecto vinculado' : `${projects.length} proyectos vinculados`}
+                      <p className="text-[11px] sm:text-xs font-semibold text-gray-500 dark:text-gray-400 mt-0.5">
+                        {projects.length === 1 ? '1 vinculado' : `${projects.length} vinculados`}
                       </p>
                     </div>
                   </button>
@@ -1297,107 +1244,204 @@ export const SubjectWorkspace: React.FC<Props> = ({
           )}
 
           {activeTab === 'tasks' && (
-            <div className="space-y-6">
-              {tasks.length === 0 ? (
-                <div className="bg-white dark:bg-[#151515] p-8 rounded-3xl border border-gray-100 dark:border-white/5 text-center">
-                  <CheckSquare className="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
-                  <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">No hay tareas asociadas a esta materia.</p>
-                  <p className="text-xs text-gray-400 mt-1">Crea una tarea desde aquí o asígnala desde el módulo general de Tasks.</p>
+            <div className="space-y-4">
+              {/* Tareas / Sesiones Toggle */}
+              <div className="flex items-center justify-between gap-3 pb-2 border-b border-gray-150 dark:border-white/10">
+                <div className="flex items-center gap-1.5 p-1 bg-gray-100 dark:bg-white/5 rounded-xl text-xs font-semibold">
                   <button
-                    onClick={() => setIsAddingTask(true)}
-                    className="mt-4 px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-xl text-xs font-bold inline-flex items-center gap-1.5"
+                    type="button"
+                    onClick={() => setTasksSubTab('tasks')}
+                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                      tasksSubTab === 'tasks'
+                        ? 'bg-white dark:bg-[#222] text-gray-900 dark:text-white shadow-2xs font-bold'
+                        : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+                    }`}
                   >
-                    <Plus className="w-4 h-4" />
-                    <span>Crear tarea</span>
+                    Tareas ({tasks.filter(t => !t.completed).length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTasksSubTab('sessions')}
+                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                      tasksSubTab === 'sessions'
+                        ? 'bg-white dark:bg-[#222] text-gray-900 dark:text-white shadow-2xs font-bold'
+                        : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+                    }`}
+                  >
+                    Registro de Sesiones ({studySessions.length})
                   </button>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  {/* PENDIENTES */}
-                  <div>
-                    <h4 className="text-xs font-extrabold uppercase tracking-wider text-gray-400 mb-2">
-                      Pendientes
-                    </h4>
-                    <div className="space-y-2">
-                      {tasks.filter(t => !t.completed).map(task => {
-                        const taskUnit = units.find(u => u.id === task.unit_id);
-                        return (
-                          <div
-                            key={task.id}
-                            className="bg-white dark:bg-[#151515] p-3.5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-2xs flex items-center justify-between group"
-                          >
-                            <div className="flex items-center gap-3">
-                              <button
-                                onClick={() => handleToggleTask(task)}
-                                className="w-5 h-5 rounded-md border-2 border-gray-300 dark:border-gray-600 flex items-center justify-center hover:border-gray-900 dark:hover:border-white transition-colors"
+
+                {tasksSubTab === 'tasks' && (
+                  <button
+                    onClick={() => setIsAddingTask(true)}
+                    className="px-3 py-1.5 bg-black dark:bg-white text-white dark:text-black rounded-xl text-xs font-bold flex items-center gap-1.5 hover:opacity-90 transition-opacity cursor-pointer shadow-2xs"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Nueva tarea</span>
+                  </button>
+                )}
+              </div>
+
+              {tasksSubTab === 'tasks' ? (
+                tasks.length === 0 ? (
+                  <div className="bg-white dark:bg-[#151515] p-8 rounded-3xl border border-gray-100 dark:border-white/5 text-center">
+                    <CheckSquare className="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+                    <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">No hay tareas asociadas a esta materia.</p>
+                    <p className="text-xs text-gray-400 mt-1">Crea una tarea desde aquí para organizar tus pendientes de clase.</p>
+                    <button
+                      onClick={() => setIsAddingTask(true)}
+                      className="mt-4 px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-xl text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Crear tarea</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {/* PENDIENTES */}
+                    <div>
+                      <h4 className="text-xs font-extrabold uppercase tracking-wider text-gray-400 mb-2">
+                        Pendientes ({tasks.filter(t => !t.completed).length})
+                      </h4>
+                      <div className="space-y-2">
+                        {tasks.filter(t => !t.completed).length === 0 ? (
+                          <div className="p-4 bg-gray-50/70 dark:bg-white/5 rounded-2xl text-center text-xs text-gray-500">
+                            ¡No tienes tareas pendientes en esta materia! 🎉
+                          </div>
+                        ) : (
+                          tasks.filter(t => !t.completed).map(task => {
+                            const taskUnit = units.find(u => u.id === task.unit_id);
+                            return (
+                              <div
+                                key={task.id}
+                                className="bg-white dark:bg-[#151515] p-3.5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-2xs flex items-center justify-between group"
                               >
-                                {task.completed && <CheckCircle2 className="w-4 h-4 text-gray-900 dark:text-white" />}
-                              </button>
-                              <div>
-                                <span className="text-sm font-semibold text-gray-900 dark:text-white block">
+                                <div className="flex items-center gap-3">
+                                  <button
+                                    onClick={() => handleToggleTask(task)}
+                                    className="w-5 h-5 rounded-md border-2 border-gray-300 dark:border-gray-600 flex items-center justify-center hover:border-gray-900 dark:hover:border-white transition-colors cursor-pointer"
+                                  >
+                                    {task.completed && <CheckCircle2 className="w-4 h-4 text-gray-900 dark:text-white" />}
+                                  </button>
+                                  <div>
+                                    <span className="text-sm font-semibold text-gray-900 dark:text-white block">
+                                      {task.text}
+                                    </span>
+                                    <div className="flex items-center gap-2 mt-0.5">
+                                      {taskUnit && (
+                                        <span className="text-[10px] font-bold px-2 py-0.5 bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white rounded-md border border-gray-200 dark:border-white/10">
+                                          {taskUnit.name}
+                                        </span>
+                                      )}
+                                      {task.due_date && (
+                                        <span className="text-[11px] text-gray-400 flex items-center gap-1">
+                                          <Calendar className="w-3 h-3" />
+                                          {task.due_date}
+                                        </span>
+                                      )}
+                                      {task.priority && (
+                                        <span className={`text-[10px] font-bold uppercase px-1.5 py-0.2 rounded border border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white`}>
+                                          {task.priority}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <button
+                                  onClick={() => handleDeleteTask(task.id)}
+                                  className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-red-500 transition-opacity cursor-pointer"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+
+                    {/* COMPLETADAS */}
+                    {tasks.some(t => t.completed) && (
+                      <div className="pt-4 border-t border-gray-100 dark:border-white/5">
+                        <h4 className="text-xs font-extrabold uppercase tracking-wider text-gray-400 mb-2">
+                          Completadas ({tasks.filter(t => t.completed).length})
+                        </h4>
+                        <div className="space-y-2 opacity-75">
+                          {tasks.filter(t => t.completed).map(task => (
+                            <div
+                              key={task.id}
+                              className="bg-white dark:bg-[#151515] p-3 rounded-2xl border border-gray-100 dark:border-white/5 flex items-center justify-between"
+                            >
+                              <div className="flex items-center gap-3">
+                                <button onClick={() => handleToggleTask(task)} className="cursor-pointer">
+                                  <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                                </button>
+                                <span className="text-sm font-medium text-gray-500 line-through">
                                   {task.text}
                                 </span>
-                                <div className="flex items-center gap-2 mt-0.5">
-                                  {taskUnit && (
-                                    <span className="text-[10px] font-bold px-2 py-0.5 bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white rounded-md border border-gray-200 dark:border-white/10">
-                                      {taskUnit.name}
-                                    </span>
-                                  )}
-                                  {task.due_date && (
-                                    <span className="text-[11px] text-gray-400 flex items-center gap-1">
-                                      <Calendar className="w-3 h-3" />
-                                      {task.due_date}
-                                    </span>
-                                  )}
-                                  {task.priority && (
-                                    <span className={`text-[10px] font-bold uppercase px-1.5 py-0.2 rounded border border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white`}>
-                                      {task.priority}
-                                    </span>
-                                  )}
-                                </div>
                               </div>
-                            </div>
-
-                            <button
-                              onClick={() => handleDeleteTask(task.id)}
-                              className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-gray-900 dark:hover:text-white transition-opacity"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* COMPLETADAS */}
-                  {tasks.some(t => t.completed) && (
-                    <div className="pt-4 border-t border-gray-100 dark:border-white/5">
-                      <h4 className="text-xs font-extrabold uppercase tracking-wider text-gray-400 mb-2">
-                        Completadas
-                      </h4>
-                      <div className="space-y-2 opacity-60">
-                        {tasks.filter(t => t.completed).map(task => (
-                          <div
-                            key={task.id}
-                            className="bg-white dark:bg-[#151515] p-3 rounded-2xl border border-gray-100 dark:border-white/5 flex items-center justify-between"
-                          >
-                            <div className="flex items-center gap-3">
-                              <button onClick={() => handleToggleTask(task)}>
-                                <CheckCircle2 className="w-5 h-5 text-gray-900 dark:text-white" />
+                              <button onClick={() => handleDeleteTask(task.id)} className="text-gray-400 hover:text-red-500 cursor-pointer">
+                                <Trash2 className="w-3.5 h-3.5" />
                               </button>
-                              <span className="text-sm font-medium text-gray-500 line-through">
-                                {task.text}
-                              </span>
                             </div>
-                            <button onClick={() => handleDeleteTask(task.id)} className="text-gray-400 hover:text-gray-900 dark:hover:text-white">
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              ) : (
+                /* REGISTRO DE SESIONES DE ESTUDIO */
+                <div className="space-y-4">
+                  <div className="bg-white dark:bg-[#151515] p-5 sm:p-6 rounded-3xl border border-gray-150/70 dark:border-white/5 shadow-2xs space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="text-sm font-bold text-gray-900 dark:text-white">
+                          Historial de Sesiones
+                        </h4>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          Total acumulado: {studySessions.reduce((acc, s) => acc + (s.duration_minutes || 0), 0)} minutos de estudio
+                        </p>
+                      </div>
+                    </div>
+
+                    {studySessions.length === 0 ? (
+                      <div className="py-8 text-center space-y-1 bg-gray-50/60 dark:bg-white/5 rounded-2xl border border-dashed border-gray-200 dark:border-white/10">
+                        <Clock className="w-8 h-8 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
+                        <p className="text-xs font-semibold text-gray-800 dark:text-gray-200">
+                          Aún no hay sesiones registradas para esta materia
+                        </p>
+                        <p className="text-[11px] text-gray-400">
+                          Inicia una sesión de estudio desde el inicio en el módulo de estudio.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2.5">
+                        {studySessions.map(session => (
+                          <div
+                            key={session.id}
+                            className="p-4 bg-gray-50 dark:bg-[#16141f] rounded-2xl border border-gray-150/70 dark:border-white/5 flex items-center justify-between gap-3 shadow-2xs"
+                          >
+                            <div className="min-w-0">
+                              <h5 className="font-bold text-xs sm:text-sm text-gray-900 dark:text-white truncate">
+                                {session.objective || 'Sesión de estudio'}
+                              </h5>
+                              <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 flex items-center gap-2">
+                                <span>📅 {new Date(session.created_at).toLocaleDateString()}</span>
+                                <span>•</span>
+                                <span>🕒 {new Date(session.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                              </p>
+                            </div>
+                            <div className="px-3 py-1.5 rounded-xl bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 text-xs sm:text-sm font-extrabold text-gray-900 dark:text-white shrink-0">
+                              {session.duration_minutes} min
+                            </div>
                           </div>
                         ))}
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -1588,56 +1632,6 @@ export const SubjectWorkspace: React.FC<Props> = ({
             </div>
           )}
 
-          {activeTab === 'study' && (
-            <div className="space-y-4">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-lg font-medium">Sesiones de Estudio</h3>
-                {!isStudying && (
-                  <button onClick={() => setIsStudying(true)} className="px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-xl text-xs font-bold shadow-2xs hover:opacity-90 transition-opacity">
-                    Iniciar Temporizador
-                  </button>
-                )}
-              </div>
-              
-              {isStudying && (
-                <div className="bg-white dark:bg-[#151515] rounded-3xl p-8 border border-gray-100 dark:border-white/5 shadow-2xs text-center">
-                  <div className="text-6xl font-light mb-6 tabular-nums">{formatTime(studySeconds)}</div>
-                  <div className="max-w-md mx-auto mb-8">
-                    <input 
-                      type="text" 
-                      value={studyObjective} 
-                      onChange={e => setStudyObjective(e.target.value)} 
-                      placeholder="¿Qué estás estudiando ahora? (Opcional)" 
-                      className="w-full px-4 py-3 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white text-center text-sm"
-                    />
-                  </div>
-                  <button onClick={handleFinishStudy} className="px-8 py-3 bg-black dark:bg-white text-white dark:text-black rounded-full font-bold text-xs hover:opacity-90 transition-opacity">
-                    Terminar Sesión
-                  </button>
-                </div>
-              )}
-
-              <div className="mt-8">
-                <h4 className="text-sm font-semibold tracking-wider text-gray-400 dark:text-gray-500 uppercase mb-4">Historial</h4>
-                {studySessions.length === 0 ? (
-                  <p className="text-sm text-gray-500">No has registrado sesiones de estudio para esta materia.</p>
-                ) : (
-                  <div className="space-y-3">
-                    {studySessions.map(session => (
-                      <div key={session.id} className="bg-white dark:bg-[#151515] p-5 rounded-2xl border border-gray-100 dark:border-white/5 flex items-center justify-between">
-                        <div>
-                          <p className="font-medium text-gray-900 dark:text-gray-100">{session.objective || 'Sesión de estudio general'}</p>
-                          <p className="text-xs text-gray-500 mt-1">{new Date(session.created_at).toLocaleDateString()}</p>
-                        </div>
-                        <div className="font-mono text-xl font-light text-gray-900 dark:text-white">{session.duration_minutes}m</div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
           {activeTab === 'grades' && (() => {
             const summary = calculateGradeSummary(subject, categories, grades);
             const usedWeight = categories.reduce((sum, c) => sum + (c.weight || 0), 0);
@@ -1818,175 +1812,6 @@ export const SubjectWorkspace: React.FC<Props> = ({
               </div>
             );
           })()}
-          {activeTab === 'flashcards' && (
-            <div className="space-y-6">
-              {/* If inspecting or practicing a deck */}
-              {selectedDeck ? (
-                <div className="space-y-6">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => { setSelectedDeck(null); setIsReviewing(false); }}
-                        className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 transition-colors text-gray-500"
-                      >
-                        ← Volver a Mazos
-                      </button>
-                      <div>
-                        <h3 className="text-xl font-bold">{selectedDeck.title}</h3>
-                        <p className="text-xs text-gray-400">
-                          {flashcards.filter(c => c.deck_id === selectedDeck.id).length} tarjetas en este mazo
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setIsAddingCard(true)}
-                        className="px-4 py-2 bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 rounded-xl text-sm font-medium transition-colors"
-                      >
-                        + Añadir Tarjeta
-                      </button>
-                      {flashcards.filter(c => c.deck_id === selectedDeck.id).length > 0 && (
-                        <button
-                          onClick={() => {
-                            setReviewIndex(0);
-                            setIsCardFlipped(false);
-                            setIsReviewing(true);
-                          }}
-                          className="px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-xl text-sm font-bold transition-opacity hover:opacity-90"
-                        >
-                          ▶ Iniciar Repaso
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Active Reviewing Session Overlay / Screen */}
-                  {isReviewing ? (
-                    <div className="bg-white dark:bg-[#151515] p-8 rounded-3xl border border-gray-100 dark:border-white/5 shadow-2xs max-w-xl mx-auto text-center space-y-6">
-                      <div className="flex justify-between items-center text-xs text-gray-400">
-                        <span>Tarjeta {reviewIndex + 1} de {flashcards.filter(c => c.deck_id === selectedDeck.id).length}</span>
-                        <button onClick={() => setIsReviewing(false)} className="hover:underline">Finalizar Repaso</button>
-                      </div>
-
-                      {/* Card Canvas with Flip Effect */}
-                      <div
-                        onClick={() => setIsCardFlipped(!isCardFlipped)}
-                        className="min-h-[220px] p-8 rounded-2xl bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 flex flex-col items-center justify-center cursor-pointer transition-all hover:border-gray-900 dark:hover:border-white"
-                      >
-                        <span className="text-xs uppercase font-bold tracking-wider text-gray-400 mb-3">
-                          {isCardFlipped ? 'Respuesta (Reverso)' : 'Pregunta (Anverso)'}
-                        </span>
-                        <p className="text-lg font-medium text-gray-900 dark:text-white">
-                          {isCardFlipped
-                            ? flashcards.filter(c => c.deck_id === selectedDeck.id)[reviewIndex]?.back
-                            : flashcards.filter(c => c.deck_id === selectedDeck.id)[reviewIndex]?.front}
-                        </p>
-                        <span className="text-xs text-gray-900 dark:text-white font-medium mt-4">Toca para voltear 🔄</span>
-                      </div>
-
-                      {/* Review Buttons */}
-                      {isCardFlipped && (
-                        <div className="flex justify-center gap-3 pt-2">
-                          <button
-                            onClick={() => handleRateFlashcard(flashcards.filter(c => c.deck_id === selectedDeck.id)[reviewIndex].id, 'learning')}
-                            className="px-4 py-2 bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white border border-gray-200 dark:border-white/10 rounded-xl text-xs font-semibold"
-                          >
-                            Difícil / Repetir
-                          </button>
-                          <button
-                            onClick={() => handleRateFlashcard(flashcards.filter(c => c.deck_id === selectedDeck.id)[reviewIndex].id, 'reviewing')}
-                            className="px-4 py-2 bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white border border-gray-200 dark:border-white/10 rounded-xl text-xs font-semibold"
-                          >
-                            Regular
-                          </button>
-                          <button
-                            onClick={() => handleRateFlashcard(flashcards.filter(c => c.deck_id === selectedDeck.id)[reviewIndex].id, 'known')}
-                            className="px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-xl text-xs font-semibold"
-                          >
-                            Fácil / Dominada
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    /* Cards Grid in Deck */
-                    <div>
-                      {flashcards.filter(c => c.deck_id === selectedDeck.id).length === 0 ? (
-                        <div className="text-center py-16 text-gray-500 bg-white dark:bg-[#151515] rounded-3xl border border-gray-100 dark:border-white/5">
-                          <p>Este mazo no contiene tarjetas todavía.</p>
-                          <button onClick={() => setIsAddingCard(true)} className="mt-3 px-4 py-2 text-sm bg-black dark:bg-white text-white dark:text-black rounded-xl">
-                            + Añadir primera tarjeta
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                          {flashcards.filter(c => c.deck_id === selectedDeck.id).map(card => (
-                            <div key={card.id} className="bg-white dark:bg-[#151515] p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-2xs space-y-3">
-                              <div className="flex justify-between items-center">
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Pregunta</span>
-                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-900 dark:bg-white/10 dark:text-white border border-gray-200 dark:border-white/10">
-                                  {card.status === 'known' ? 'Dominada' : card.status === 'learning' ? 'Repasar' : 'Nueva'}
-                                </span>
-                              </div>
-                              <p className="font-semibold text-sm line-clamp-3">{card.front}</p>
-                              <div className="pt-2 border-t border-gray-100 dark:border-white/5">
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1">Respuesta</span>
-                                <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-3">{card.back}</p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                /* Deck List Overview */
-                <div>
-                  <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-lg font-medium">Flashcards y Repaso</h3>
-                    <button onClick={() => setIsAddingDeck(true)} className="px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-xl text-sm font-bold hover:opacity-90 transition-opacity">
-                      + Crear Mazo
-                    </button>
-                  </div>
-
-                  {decks.length === 0 ? (
-                    <div className="text-center py-20 text-gray-500 bg-white dark:bg-[#151515] rounded-3xl border border-gray-100 dark:border-white/5">
-                      <p>Aún no tienes mazos de flashcards creados.</p>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                      {decks.map(deck => {
-                        const deckCount = flashcards.filter(c => c.deck_id === deck.id).length;
-                        return (
-                          <div
-                            key={deck.id}
-                            onClick={() => setSelectedDeck(deck)}
-                            className="bg-white dark:bg-[#151515] p-6 rounded-3xl border border-gray-100 dark:border-white/5 shadow-2xs flex flex-col gap-4 group hover:border-gray-300 dark:hover:border-white/20 transition-all cursor-pointer"
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white flex items-center justify-center text-2xl border border-gray-200 dark:border-white/10">
-                                🗂️
-                              </div>
-                              <div>
-                                <h4 className="font-semibold text-lg">{deck.title}</h4>
-                                <p className="text-xs text-gray-400">{deckCount} {deckCount === 1 ? 'tarjeta' : 'tarjetas'}</p>
-                              </div>
-                            </div>
-                            <div className="mt-auto">
-                              <button className="w-full py-2 bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 rounded-xl text-sm font-medium transition-colors">
-                                {deckCount > 0 ? 'Abrir y Repasar' : 'Añadir Tarjetas'}
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
             </>
           )}
         </div>

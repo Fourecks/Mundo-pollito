@@ -8,7 +8,7 @@ import { SubjectWorkspace } from './SubjectWorkspace';
 import { AcademicAnalytics } from './AcademicAnalytics';
 import { computeGoalProgress } from './utils/goalProgress';
 import { calculateGradeSummary } from './utils/gradeCalculator';
-import { ChevronLeft, ChevronRight, Plus, X, Calendar, BookOpen, Target, BarChart2, CheckCircle2, Trash2, Clock, MapPin, Video, Check } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, X, Calendar, BookOpen, Target, BarChart2, CheckCircle2, Trash2, Clock, MapPin, Video, Check, Play } from 'lucide-react';
 import { CreateSubjectFullScreen } from './CreateSubjectFullScreen';
 import { renderSubjectIcon } from './subjectIcons';
 
@@ -434,6 +434,76 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
   const [activeSubject, setActiveSubject] = useState<Subject | null>(null);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'subjects' | 'calendar' | 'schedule' | 'library' | 'goals' | 'analytics'>('dashboard');
   const [completedTodayIds, setCompletedTodayIds] = useState<Set<string>>(new Set());
+
+  // Horizontal Live Study Session Widget States
+  const [liveStudyTopic, setLiveStudyTopic] = useState('');
+  const [liveStudySubjectId, setLiveStudySubjectId] = useState('');
+  const [isLiveStudyActive, setIsLiveStudyActive] = useState(false);
+  const [isLiveStudyPaused, setIsLiveStudyPaused] = useState(false);
+  const [liveStudySeconds, setLiveStudySeconds] = useState(0);
+  const [liveStudyToast, setLiveStudyToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    let interval: any = null;
+    if (isLiveStudyActive && !isLiveStudyPaused) {
+      interval = setInterval(() => {
+        setLiveStudySeconds(s => s + 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isLiveStudyActive, isLiveStudyPaused]);
+
+  const handleStartStudy = () => {
+    setIsLiveStudyActive(true);
+    setIsLiveStudyPaused(false);
+  };
+
+  const handlePauseToggleStudy = () => {
+    setIsLiveStudyPaused(prev => !prev);
+  };
+
+  const handleSaveStudySession = async () => {
+    const durationMinutes = Math.max(1, Math.round(liveStudySeconds / 60));
+    let userId = 'local';
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.id) userId = user.id;
+    } catch {}
+
+    const newSession: StudySession = {
+      id: generateUUID(),
+      user_id: userId,
+      subject_id: liveStudySubjectId || (subjects[0]?.id || 'general'),
+      duration_minutes: durationMinutes,
+      objective: liveStudyTopic.trim() || 'Sesión de estudio',
+      status: 'completed',
+      created_at: new Date().toISOString()
+    };
+
+    setStudySessions(prev => [newSession, ...prev]);
+    setIsLiveStudyActive(false);
+    setIsLiveStudyPaused(false);
+    setLiveStudySeconds(0);
+    setLiveStudyTopic('');
+    setLiveStudyToast(`¡Sesión de ${durationMinutes} min guardada!`);
+    setTimeout(() => setLiveStudyToast(null), 3000);
+
+    try {
+      await syncableCreate('student_study_sessions', newSession);
+    } catch (e) {
+      console.error("Error saving study session:", e);
+    }
+  };
+
+  const formatStudyTime = (totalSec: number) => {
+    const hrs = Math.floor(totalSec / 3600);
+    const mins = Math.floor((totalSec % 3600) / 60);
+    const secs = totalSec % 60;
+    if (hrs > 0) {
+      return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
   
   // Mobile navigation states (synced with controlled prop if provided)
   const [internalMobileTab, setInternalMobileTab] = useState<'resumen' | 'materias' | 'mas'>('resumen');
@@ -497,103 +567,6 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
       let finalSubjects = loadedSubjects || [];
       let finalPeriods = loadedPeriods || [];
       let finalSchedules = loadedSchedules || [];
-
-      if (finalSubjects.length === 0) {
-        const defaultPeriodId = crypto.randomUUID ? crypto.randomUUID() : 'period-9no';
-        const defaultPeriod: AcademicPeriod = {
-          id: defaultPeriodId,
-          user_id: 'local',
-          name: '9no Semestre',
-          start_date: '2026-02-01',
-          end_date: '2026-06-30',
-          is_active: true,
-          created_at: new Date().toISOString()
-        };
-
-        const subj1: Subject = {
-          id: 'subj-1',
-          user_id: 'local',
-          period_id: defaultPeriodId,
-          name: 'Sistemas Estructurales II',
-          color: '#0d9488',
-          icon_name: 'Hammer',
-          days: ['Lunes', 'Jueves', 'Sábado'],
-          start_time: '10:07',
-          end_time: '12:07',
-          created_at: new Date().toISOString()
-        };
-
-        const subj2: Subject = {
-          id: 'subj-2',
-          user_id: 'local',
-          period_id: defaultPeriodId,
-          name: 'Diseño de Interiores II',
-          color: '#f43f5e',
-          icon_name: 'Landmark',
-          days: ['Lunes', 'Jueves', 'Viernes'],
-          start_time: '12:00',
-          end_time: '14:00',
-          created_at: new Date().toISOString()
-        };
-
-        const subj3: Subject = {
-          id: 'subj-3',
-          user_id: 'local',
-          period_id: defaultPeriodId,
-          name: 'Taller de Proyectos IV',
-          color: '#6366f1',
-          icon_name: 'Box',
-          days: ['Lunes', 'Miércoles', 'Viernes'],
-          start_time: '07:00',
-          end_time: '09:00',
-          created_at: new Date().toISOString()
-        };
-
-        const subj4: Subject = {
-          id: 'subj-4',
-          user_id: 'local',
-          period_id: defaultPeriodId,
-          name: 'Teoría de la Arquitectura',
-          color: '#0284c7',
-          icon_name: 'PieChart',
-          days: ['Martes', 'Jueves'],
-          start_time: '08:00',
-          end_time: '10:00',
-          created_at: new Date().toISOString()
-        };
-
-        finalSubjects = [subj1, subj2, subj3, subj4];
-        finalPeriods = [defaultPeriod];
-
-        // Seed schedules for subjects
-        const daysMapAll = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
-        const seededSchedules: SubjectSchedule[] = [];
-        finalSubjects.forEach(s => {
-          (s.days || []).forEach(d => {
-            seededSchedules.push({
-              id: `sched-${s.id}-${d}`,
-              subject_id: s.id,
-              day_of_week: d,
-              start_time: s.start_time || '08:00',
-              end_time: s.end_time || '10:00',
-              repeat_weekly: true
-            });
-          });
-        });
-        finalSchedules = seededSchedules;
-
-        try {
-          await syncableCreate('student_academic_periods', defaultPeriod);
-          for (const s of finalSubjects) {
-            await syncableCreate('student_subjects', s);
-          }
-          for (const sc of finalSchedules) {
-            await syncableCreate('student_subject_schedules', sc);
-          }
-        } catch (e) {
-          console.warn("Could not save initial sample student data", e);
-        }
-      }
 
       setSubjects(finalSubjects);
       setPeriods(finalPeriods);
@@ -1381,13 +1354,112 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
                     const displayName = userName || 'Axel';
 
                     return (
-                      <div className="pt-2 pb-1">
+                      <div className="pt-2 pb-0.5">
                         <h1 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white tracking-tight">
                           {getGreeting()}, {displayName}
                         </h1>
                       </div>
                     );
                   })()}
+
+                  {/* SESIÓN DE ESTUDIO HORIZONTAL */}
+                  <div className="bg-white dark:bg-[#16141f] rounded-2xl sm:rounded-3xl p-4 sm:p-5 border border-gray-150/80 dark:border-white/10 shadow-sm space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                          Sesión de Estudio
+                        </span>
+                      </div>
+                      {liveStudyToast && (
+                        <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800/40">
+                          {liveStudyToast}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Fila Horizontal: Input de tema, Selector de materia y Controles */}
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+                      {/* Input de tema */}
+                      <input
+                        type="text"
+                        value={liveStudyTopic}
+                        onChange={e => setLiveStudyTopic(e.target.value)}
+                        placeholder="¿Qué vas a estudiar? (Tema u objetivo)..."
+                        className="flex-1 px-3.5 py-2.5 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white text-gray-900 dark:text-white placeholder:text-gray-400 min-w-0"
+                      />
+
+                      {/* Selector de materia */}
+                      <select
+                        value={liveStudySubjectId}
+                        onChange={e => setLiveStudySubjectId(e.target.value)}
+                        className="px-3 py-2.5 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl text-xs font-semibold focus:outline-none text-gray-900 dark:text-white cursor-pointer sm:max-w-[180px] truncate shrink-0"
+                      >
+                        <option value="">Sin materia (General)</option>
+                        {subjects.map(s => (
+                          <option key={s.id} value={s.id}>
+                            {s.name}
+                          </option>
+                        ))}
+                      </select>
+
+                      {/* Controles del temporizador */}
+                      {!isLiveStudyActive ? (
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={handleStartStudy}
+                            className="flex-1 sm:flex-none px-4 py-2.5 bg-black text-white dark:bg-white dark:text-black rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 hover:opacity-90 active:scale-95 transition-all shadow-2xs cursor-pointer"
+                          >
+                            <Play className="w-3.5 h-3.5 fill-current" />
+                            <span>Iniciar</span>
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 shrink-0">
+                          {/* Timer display */}
+                          <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 dark:bg-blue-950/40 rounded-xl border border-blue-200 dark:border-blue-800/40 text-blue-700 dark:text-blue-300 font-mono text-xs font-bold shrink-0">
+                            <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                            <span>{formatStudyTime(liveStudySeconds)}</span>
+                          </div>
+
+                          {/* Pause / Resume */}
+                          <button
+                            type="button"
+                            onClick={handlePauseToggleStudy}
+                            className="px-3 py-2 bg-gray-100 dark:bg-white/10 text-gray-800 dark:text-gray-200 rounded-xl text-xs font-bold hover:bg-gray-200 dark:hover:bg-white/15 transition-colors cursor-pointer"
+                          >
+                            {isLiveStudyPaused ? 'Reanudar' : 'Pausar'}
+                          </button>
+
+                          {/* Save */}
+                          <button
+                            type="button"
+                            onClick={handleSaveStudySession}
+                            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
+                          >
+                            <Check className="w-3.5 h-3.5 stroke-[3]" />
+                            <span>Guardar</span>
+                          </button>
+
+                          {/* Discard */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsLiveStudyActive(false);
+                              setIsLiveStudyPaused(false);
+                              setLiveStudySeconds(0);
+                              setLiveStudyTopic('');
+                            }}
+                            className="p-2 text-gray-400 hover:text-red-500 rounded-xl transition-colors cursor-pointer"
+                            title="Descartar sesión"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
 
                   {/* SECCIÓN HOY */}
                   {(() => {
@@ -1438,22 +1510,6 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
                         subjectId: subj?.id
                       });
                     });
-
-                    // Fallback to show items if user has subjects but none specifically on this day schedule
-                    if (todayItems.length === 0 && subjects.length > 0) {
-                      subjects.slice(0, 2).forEach((subj, idx) => {
-                        const sched = schedules.find(s => s.subject_id === subj.id);
-                        todayItems.push({
-                          id: `subj-preview-${subj.id}`,
-                          title: subj.name,
-                          timeRange: sched ? `${sched.start_time} — ${sched.end_time}` : (idx === 0 ? '07:00 — 09:00' : '10:07 — 12:07'),
-                          color: subj.color || (idx === 0 ? '#6366f1' : '#14b8a6'),
-                          completed: completedTodayIds.has(`subj-preview-${subj.id}`),
-                          type: 'schedule',
-                          subjectId: subj.id
-                        });
-                      });
-                    }
 
                     return (
                       <section className="space-y-3">
