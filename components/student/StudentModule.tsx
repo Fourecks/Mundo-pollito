@@ -585,18 +585,37 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (user?.id && navigator.onLine) {
-          const { data: remoteSubjects } = await supabase.from('student_subjects').select('*').eq('user_id', user.id);
-          if (remoteSubjects && remoteSubjects.length > 0) {
-            setSubjects(remoteSubjects);
-          }
-          const { data: remoteGoals } = await supabase.from('student_goals').select('*').eq('user_id', user.id);
-          if (remoteGoals && remoteGoals.length > 0) {
-            setGoals(remoteGoals);
-          }
-          const { data: remoteReadings } = await supabase.from('student_readings').select('*').eq('user_id', user.id);
-          if (remoteReadings && remoteReadings.length > 0) {
-            setReadings(remoteReadings);
-          }
+          const [
+            { data: remoteSubjects },
+            { data: remoteSchedules },
+            { data: remotePeriods },
+            { data: remoteExams },
+            { data: remoteGoals },
+            { data: remoteReadings },
+            { data: remoteSessions },
+            { data: remoteCategories },
+            { data: remoteGrades }
+          ] = await Promise.all([
+            supabase.from('student_subjects').select('*').eq('user_id', user.id),
+            supabase.from('student_subject_schedules').select('*').eq('user_id', user.id),
+            supabase.from('student_academic_periods').select('*').eq('user_id', user.id),
+            supabase.from('student_exams').select('*').eq('user_id', user.id),
+            supabase.from('student_goals').select('*').eq('user_id', user.id),
+            supabase.from('student_readings').select('*').eq('user_id', user.id),
+            supabase.from('student_study_sessions').select('*').eq('user_id', user.id),
+            supabase.from('student_grade_categories').select('*').eq('user_id', user.id),
+            supabase.from('student_grades').select('*').eq('user_id', user.id),
+          ]);
+
+          if (remoteSubjects) setSubjects(remoteSubjects);
+          if (remoteSchedules) setSchedules(remoteSchedules);
+          if (remotePeriods && remotePeriods.length > 0) setPeriods(remotePeriods);
+          if (remoteExams) setExams(remoteExams);
+          if (remoteGoals) setGoals(remoteGoals);
+          if (remoteReadings) setReadings(remoteReadings);
+          if (remoteSessions) setStudySessions(remoteSessions);
+          if (remoteCategories) setCategories(remoteCategories);
+          if (remoteGrades) setGrades(remoteGrades);
         }
       } catch (err) {
         console.warn("Supabase fetch warning:", err);

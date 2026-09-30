@@ -206,24 +206,35 @@ export const SubjectWorkspace: React.FC<Props> = ({
       setTasks(allTodos.filter(t => t.subject_id === subject.id));
       setProjects(allProjects.filter(p => p.subject_id === subject.id));
 
-      // Background Supabase Sync if online - ONLY update if non-empty to prevent state wipe
+      // Background Supabase Sync if online
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (user?.id && navigator.onLine) {
-          const { data: remoteDecks } = await supabase.from('student_decks').select('*').eq('subject_id', subject.id);
-          if (remoteDecks && remoteDecks.length > 0) setDecks(remoteDecks);
-          
-          const { data: remoteExams } = await supabase.from('student_exams').select('*').eq('subject_id', subject.id);
-          if (remoteExams && remoteExams.length > 0) setExams(remoteExams);
+          const [
+            { data: remoteUnits },
+            { data: remoteExams },
+            { data: remoteGrades },
+            { data: remoteCategories },
+            { data: remoteResources },
+            { data: remoteSessions },
+            { data: remoteAttendances }
+          ] = await Promise.all([
+            supabase.from('student_units').select('*').eq('subject_id', subject.id),
+            supabase.from('student_exams').select('*').eq('subject_id', subject.id),
+            supabase.from('student_grades').select('*').eq('subject_id', subject.id),
+            supabase.from('student_grade_categories').select('*').eq('subject_id', subject.id),
+            supabase.from('student_resources').select('*').eq('subject_id', subject.id),
+            supabase.from('student_study_sessions').select('*').eq('subject_id', subject.id),
+            supabase.from('student_attendance').select('*').eq('subject_id', subject.id),
+          ]);
 
-          const { data: remoteGrades } = await supabase.from('student_grades').select('*').eq('subject_id', subject.id);
-          if (remoteGrades && remoteGrades.length > 0) setGrades(remoteGrades);
-
-          const { data: remoteResources } = await supabase.from('student_resources').select('*').eq('subject_id', subject.id);
-          if (remoteResources && remoteResources.length > 0) setResources(remoteResources);
-
-          const { data: remoteUnits } = await supabase.from('student_units').select('*').eq('subject_id', subject.id);
-          if (remoteUnits && remoteUnits.length > 0) setUnits(remoteUnits);
+          if (remoteUnits) setUnits(remoteUnits);
+          if (remoteExams) setExams(remoteExams);
+          if (remoteGrades) setGrades(remoteGrades);
+          if (remoteCategories) setCategories(remoteCategories);
+          if (remoteResources) setResources(remoteResources);
+          if (remoteSessions) setStudySessions(remoteSessions);
+          if (remoteAttendances) setAttendances(remoteAttendances);
         }
       } catch (err) {
         console.warn("Supabase fetch in workspace:", err);
@@ -811,10 +822,10 @@ export const SubjectWorkspace: React.FC<Props> = ({
               </button>
               <button
                 onClick={() => setShowMobileActionSheet(true)}
-                className="px-3 sm:px-4 py-2 rounded-xl bg-black dark:bg-white text-white dark:text-black hover:opacity-90 transition-opacity text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                className="w-9 h-9 rounded-xl bg-black dark:bg-white text-white dark:text-black hover:opacity-90 transition-opacity flex items-center justify-center cursor-pointer shadow-2xs active:scale-95 shrink-0"
+                title="Añadir a esta unidad"
               >
                 <Plus className="w-4 h-4" />
-                <span>Añadir</span>
               </button>
             </div>
           </div>
@@ -848,11 +859,31 @@ export const SubjectWorkspace: React.FC<Props> = ({
 
             <div className="flex items-center gap-2 shrink-0">
               <button
-                onClick={() => setShowMobileActionSheet(true)}
+                onClick={() => {
+                  if (activeTab === 'units') {
+                    setIsAddingUnit(true);
+                  } else if (activeTab === 'tasks') {
+                    setNewTaskUnitId('');
+                    setIsAddingTask(true);
+                  } else if (activeTab === 'exams') {
+                    setNewExamUnitId('');
+                    setIsAddingExam(true);
+                  } else if (activeTab === 'notes') {
+                    onAddNote(null, undefined, subject.id);
+                  } else if (activeTab === 'projects') {
+                    setIsAddingProject(true);
+                  } else if (activeTab === 'grades') {
+                    setIsAddingGrade(true);
+                  } else {
+                    setShowMobileActionSheet(true);
+                  }
+                }}
                 className="px-3.5 sm:px-4 py-2 rounded-xl bg-black dark:bg-white text-white dark:text-black hover:opacity-90 transition-opacity text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs active:scale-95"
               >
                 <Plus className="w-4 h-4" />
-                <span>Añadir</span>
+                <span>
+                  {activeTab === 'units' ? 'Nueva unidad' : activeTab === 'tasks' ? 'Nueva tarea' : activeTab === 'exams' ? 'Nuevo examen' : activeTab === 'projects' ? 'Nuevo proyecto' : activeTab === 'grades' ? 'Nueva nota' : 'Añadir'}
+                </span>
               </button>
             </div>
           </div>
@@ -1017,8 +1048,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                   >
                     <div className="flex items-center justify-between w-full">
                       <div 
-                        className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0"
-                        style={{ backgroundColor: `${subject.color || '#0d9488'}20`, color: subject.color || '#0d9488' }}
+                        className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white"
                       >
                         <FolderKanban className="w-4 h-4 sm:w-5 sm:h-5" />
                       </div>
@@ -1027,7 +1057,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                       </div>
                     </div>
                     <div className="mt-2.5">
-                      <h4 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white block group-hover:text-blue-500 transition-colors">
+                      <h4 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white block group-hover:opacity-80 transition-opacity">
                         Unidades
                       </h4>
                       <p className="text-[11px] sm:text-xs font-semibold text-gray-500 dark:text-gray-400 mt-0.5">
@@ -1043,7 +1073,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                   >
                     <div className="flex items-center justify-between w-full">
                       <div 
-                        className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 bg-blue-500/15 text-blue-500"
+                        className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white"
                       >
                         <CheckSquare className="w-4 h-4 sm:w-5 sm:h-5" />
                       </div>
@@ -1052,7 +1082,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                       </div>
                     </div>
                     <div className="mt-2.5">
-                      <h4 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white block group-hover:text-blue-500 transition-colors">
+                      <h4 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white block group-hover:opacity-80 transition-opacity">
                         Tareas
                       </h4>
                       <p className="text-[11px] sm:text-xs font-semibold text-gray-500 dark:text-gray-400 mt-0.5">
@@ -1068,7 +1098,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                   >
                     <div className="flex items-center justify-between w-full">
                       <div 
-                        className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 bg-amber-500/15 text-amber-500"
+                        className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white"
                       >
                         <Calendar className="w-4 h-4 sm:w-5 sm:h-5" />
                       </div>
@@ -1077,7 +1107,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                       </div>
                     </div>
                     <div className="mt-2.5">
-                      <h4 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white block group-hover:text-blue-500 transition-colors">
+                      <h4 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white block group-hover:opacity-80 transition-opacity">
                         Evaluaciones
                       </h4>
                       <p className="text-[11px] sm:text-xs font-semibold text-gray-500 dark:text-gray-400 mt-0.5">
@@ -1093,7 +1123,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                   >
                     <div className="flex items-center justify-between w-full">
                       <div 
-                        className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 bg-purple-500/15 text-purple-500"
+                        className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white"
                       >
                         <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
                       </div>
@@ -1102,7 +1132,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                       </div>
                     </div>
                     <div className="mt-2.5">
-                      <h4 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white block group-hover:text-blue-500 transition-colors">
+                      <h4 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white block group-hover:opacity-80 transition-opacity">
                         Apuntes
                       </h4>
                       <p className="text-[11px] sm:text-xs font-semibold text-gray-500 dark:text-gray-400 mt-0.5">
@@ -1118,7 +1148,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                   >
                     <div className="flex items-center justify-between w-full">
                       <div 
-                        className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 bg-emerald-500/15 text-emerald-500"
+                        className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white"
                       >
                         <Award className="w-4 h-4 sm:w-5 sm:h-5" />
                       </div>
@@ -1127,7 +1157,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                       </div>
                     </div>
                     <div className="mt-2.5">
-                      <h4 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white block group-hover:text-blue-500 transition-colors">
+                      <h4 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white block group-hover:opacity-80 transition-opacity">
                         Calificaciones
                       </h4>
                       <p className="text-[11px] sm:text-xs font-semibold text-gray-500 dark:text-gray-400 mt-0.5">
@@ -1143,7 +1173,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                   >
                     <div className="flex items-center justify-between w-full">
                       <div 
-                        className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 bg-teal-500/15 text-teal-500"
+                        className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white"
                       >
                         <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
                       </div>
@@ -1152,7 +1182,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                       </div>
                     </div>
                     <div className="mt-2.5">
-                      <h4 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white block group-hover:text-blue-500 transition-colors">
+                      <h4 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white block group-hover:opacity-80 transition-opacity">
                         Proyectos
                       </h4>
                       <p className="text-[11px] sm:text-xs font-semibold text-gray-500 dark:text-gray-400 mt-0.5">
@@ -1246,7 +1276,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
           {activeTab === 'tasks' && (
             <div className="space-y-4">
               {/* Tareas / Sesiones Toggle */}
-              <div className="flex items-center justify-between gap-3 pb-2 border-b border-gray-150 dark:border-white/10">
+              <div className="flex items-center justify-start pb-2 border-b border-gray-150 dark:border-white/10">
                 <div className="flex items-center gap-1.5 p-1 bg-gray-100 dark:bg-white/5 rounded-xl text-xs font-semibold">
                   <button
                     type="button"
@@ -1271,16 +1301,6 @@ export const SubjectWorkspace: React.FC<Props> = ({
                     Registro de Sesiones ({studySessions.length})
                   </button>
                 </div>
-
-                {tasksSubTab === 'tasks' && (
-                  <button
-                    onClick={() => setIsAddingTask(true)}
-                    className="px-3 py-1.5 bg-black dark:bg-white text-white dark:text-black rounded-xl text-xs font-bold flex items-center gap-1.5 hover:opacity-90 transition-opacity cursor-pointer shadow-2xs"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Nueva tarea</span>
-                  </button>
-                )}
               </div>
 
               {tasksSubTab === 'tasks' ? (
@@ -2177,63 +2197,96 @@ export const SubjectWorkspace: React.FC<Props> = ({
             >
               <div className="w-12 h-1 bg-gray-300 dark:bg-gray-700 rounded-full mx-auto mb-3 sm:hidden" />
               <div className="flex items-center justify-between pb-4 border-b border-gray-100 dark:border-white/10 mb-4">
-                <h3 className="text-base font-bold text-gray-900 dark:text-white">Añadir a {subject.name}</h3>
+                <h3 className="text-base font-bold text-gray-900 dark:text-white truncate pr-2">
+                  {activeUnit ? `Añadir a Unidad: ${activeUnit.name}` : `Añadir a ${subject.name}`}
+                </h3>
                 <button
                   onClick={() => setShowMobileActionSheet(false)}
-                  className="p-1 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                  className="p-1 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 shrink-0 cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              <div className="grid grid-cols-2 gap-2.5">
-                <button
-                  onClick={() => { setShowMobileActionSheet(false); setIsAddingTask(true); }}
-                  className="p-3 bg-gray-50 dark:bg-[#222] rounded-2xl border border-gray-150 dark:border-white/5 text-left hover:bg-gray-100 dark:hover:bg-[#282828] transition-colors"
-                >
-                  <span className="text-xs font-bold text-gray-900 dark:text-white block">Tarea</span>
-                  <span className="text-[10px] text-gray-500">Pendiente de clase</span>
-                </button>
 
-                <button
-                  onClick={() => { setShowMobileActionSheet(false); setIsAddingExam(true); }}
-                  className="p-3 bg-gray-50 dark:bg-[#222] rounded-2xl border border-gray-150 dark:border-white/5 text-left hover:bg-gray-100 dark:hover:bg-[#282828] transition-colors"
-                >
-                  <span className="text-xs font-bold text-gray-900 dark:text-white block">Examen</span>
-                  <span className="text-[10px] text-gray-500">Evaluación parcial/final</span>
-                </button>
+              {activeUnit ? (
+                /* ACCIONES EXCLUSIVAS PARA LA UNIDAD ACTIVA */
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  <button
+                    onClick={() => { setShowMobileActionSheet(false); setNewTaskUnitId(activeUnit.id); setIsAddingTask(true); }}
+                    className="p-3.5 bg-gray-50 dark:bg-[#222] rounded-2xl border border-gray-150 dark:border-white/5 text-left hover:bg-gray-100 dark:hover:bg-[#282828] transition-colors cursor-pointer"
+                  >
+                    <span className="text-xs font-bold text-gray-900 dark:text-white block">Tarea</span>
+                    <span className="text-[10px] text-gray-500">Asignada a esta unidad</span>
+                  </button>
 
-                <button
-                  onClick={() => { setShowMobileActionSheet(false); onAddNote(null, undefined, subject.id); }}
-                  className="p-3 bg-gray-50 dark:bg-[#222] rounded-2xl border border-gray-150 dark:border-white/5 text-left hover:bg-gray-100 dark:hover:bg-[#282828] transition-colors"
-                >
-                  <span className="text-xs font-bold text-gray-900 dark:text-white block">Apunte</span>
-                  <span className="text-[10px] text-gray-500">Nota de clase</span>
-                </button>
+                  <button
+                    onClick={() => { setShowMobileActionSheet(false); setNewExamUnitId(activeUnit.id); setIsAddingExam(true); }}
+                    className="p-3.5 bg-gray-50 dark:bg-[#222] rounded-2xl border border-gray-150 dark:border-white/5 text-left hover:bg-gray-100 dark:hover:bg-[#282828] transition-colors cursor-pointer"
+                  >
+                    <span className="text-xs font-bold text-gray-900 dark:text-white block">Examen</span>
+                    <span className="text-[10px] text-gray-500">Evaluación de la unidad</span>
+                  </button>
 
-                <button
-                  onClick={() => { setShowMobileActionSheet(false); setIsAddingResource(true); }}
-                  className="p-3 bg-gray-50 dark:bg-[#222] rounded-2xl border border-gray-150 dark:border-white/5 text-left hover:bg-gray-100 dark:hover:bg-[#282828] transition-colors"
-                >
-                  <span className="text-xs font-bold text-gray-900 dark:text-white block">Recurso</span>
-                  <span className="text-[10px] text-gray-500">Enlace o archivo</span>
-                </button>
+                  <button
+                    onClick={() => { setShowMobileActionSheet(false); onAddNote(null, undefined, subject.id); }}
+                    className="p-3.5 bg-gray-50 dark:bg-[#222] rounded-2xl border border-gray-150 dark:border-white/5 text-left hover:bg-gray-100 dark:hover:bg-[#282828] transition-colors cursor-pointer"
+                  >
+                    <span className="text-xs font-bold text-gray-900 dark:text-white block">Apunte</span>
+                    <span className="text-[10px] text-gray-500">Nota de la materia</span>
+                  </button>
+                </div>
+              ) : (
+                /* ACCIONES GENERALES DE LA MATERIA */
+                <div className="grid grid-cols-2 gap-2.5">
+                  <button
+                    onClick={() => { setShowMobileActionSheet(false); setNewTaskUnitId(''); setIsAddingTask(true); }}
+                    className="p-3 bg-gray-50 dark:bg-[#222] rounded-2xl border border-gray-150 dark:border-white/5 text-left hover:bg-gray-100 dark:hover:bg-[#282828] transition-colors cursor-pointer"
+                  >
+                    <span className="text-xs font-bold text-gray-900 dark:text-white block">Tarea</span>
+                    <span className="text-[10px] text-gray-500">Pendiente de clase</span>
+                  </button>
 
-                <button
-                  onClick={() => { setShowMobileActionSheet(false); setIsAddingUnit(true); }}
-                  className="p-3 bg-gray-50 dark:bg-[#222] rounded-2xl border border-gray-150 dark:border-white/5 text-left hover:bg-gray-100 dark:hover:bg-[#282828] transition-colors"
-                >
-                  <span className="text-xs font-bold text-gray-900 dark:text-white block">Unidad</span>
-                  <span className="text-[10px] text-gray-500">Temario oficial</span>
-                </button>
+                  <button
+                    onClick={() => { setShowMobileActionSheet(false); setNewExamUnitId(''); setIsAddingExam(true); }}
+                    className="p-3 bg-gray-50 dark:bg-[#222] rounded-2xl border border-gray-150 dark:border-white/5 text-left hover:bg-gray-100 dark:hover:bg-[#282828] transition-colors cursor-pointer"
+                  >
+                    <span className="text-xs font-bold text-gray-900 dark:text-white block">Examen</span>
+                    <span className="text-[10px] text-gray-500">Evaluación parcial/final</span>
+                  </button>
 
-                <button
-                  onClick={() => { setShowMobileActionSheet(false); setIsAddingProject(true); }}
-                  className="p-3 bg-gray-50 dark:bg-[#222] rounded-2xl border border-gray-150 dark:border-white/5 text-left hover:bg-gray-100 dark:hover:bg-[#282828] transition-colors"
-                >
-                  <span className="text-xs font-bold text-gray-900 dark:text-white block">Proyecto</span>
-                  <span className="text-[10px] text-gray-500">Trabajo individual o grupal</span>
-                </button>
-              </div>
+                  <button
+                    onClick={() => { setShowMobileActionSheet(false); onAddNote(null, undefined, subject.id); }}
+                    className="p-3 bg-gray-50 dark:bg-[#222] rounded-2xl border border-gray-150 dark:border-white/5 text-left hover:bg-gray-100 dark:hover:bg-[#282828] transition-colors cursor-pointer"
+                  >
+                    <span className="text-xs font-bold text-gray-900 dark:text-white block">Apunte</span>
+                    <span className="text-[10px] text-gray-500">Nota de clase</span>
+                  </button>
+
+                  <button
+                    onClick={() => { setShowMobileActionSheet(false); setIsAddingResource(true); }}
+                    className="p-3 bg-gray-50 dark:bg-[#222] rounded-2xl border border-gray-150 dark:border-white/5 text-left hover:bg-gray-100 dark:hover:bg-[#282828] transition-colors cursor-pointer"
+                  >
+                    <span className="text-xs font-bold text-gray-900 dark:text-white block">Recurso</span>
+                    <span className="text-[10px] text-gray-500">Enlace o archivo</span>
+                  </button>
+
+                  <button
+                    onClick={() => { setShowMobileActionSheet(false); setIsAddingUnit(true); }}
+                    className="p-3 bg-gray-50 dark:bg-[#222] rounded-2xl border border-gray-150 dark:border-white/5 text-left hover:bg-gray-100 dark:hover:bg-[#282828] transition-colors cursor-pointer"
+                  >
+                    <span className="text-xs font-bold text-gray-900 dark:text-white block">Unidad</span>
+                    <span className="text-[10px] text-gray-500">Temario oficial</span>
+                  </button>
+
+                  <button
+                    onClick={() => { setShowMobileActionSheet(false); setIsAddingProject(true); }}
+                    className="p-3 bg-gray-50 dark:bg-[#222] rounded-2xl border border-gray-150 dark:border-white/5 text-left hover:bg-gray-100 dark:hover:bg-[#282828] transition-colors cursor-pointer"
+                  >
+                    <span className="text-xs font-bold text-gray-900 dark:text-white block">Proyecto</span>
+                    <span className="text-[10px] text-gray-500">Trabajo individual o grupal</span>
+                  </button>
+                </div>
+              )}
             </motion.div>
           </div>
         )}
