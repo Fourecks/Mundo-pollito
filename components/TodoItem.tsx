@@ -90,6 +90,16 @@ const TodoItem: React.FC<TodoItemProps> = ({
         {/* Task Text & Subtask Toggle */}
         <div className="flex-grow flex items-center gap-2 ml-4 min-w-0">
             {color && <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />}
+            {todo.academic_type === 'exam' && (
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white border border-gray-200 dark:border-white/10 shrink-0">
+                    📝 Examen
+                </span>
+            )}
+            {todo.academic_type === 'homework' && (
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white border border-gray-200 dark:border-white/10 shrink-0">
+                    📚 Tarea
+                </span>
+            )}
             {todo.start_time && (
                 <span className={`text-xs font-semibold text-primary-dark dark:text-primary flex-shrink-0 ${todo.completed ? 'opacity-70' : ''}`}>
                     {formatTime(todo.start_time)}{todo.end_time ? ` - ${formatTime(todo.end_time)}` : ''}

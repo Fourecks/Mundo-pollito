@@ -96,7 +96,12 @@ export const SubjectWorkspace: React.FC<Props> = ({
   const [newExamLocation, setNewExamLocation] = useState('');
   const [newExamUnitId, setNewExamUnitId] = useState('');
   const [newExamType, setNewExamType] = useState<Exam['type']>('midterm');
+  const [newExamWeight, setNewExamWeight] = useState('');
+  const [newExamCategoryId, setNewExamCategoryId] = useState('');
   const [newExamNotes, setNewExamNotes] = useState('');
+  const [editingScoreExamId, setEditingScoreExamId] = useState<string | null>(null);
+  const [editingScoreTaskId, setEditingScoreTaskId] = useState<number | null>(null);
+  const [scoreInputValue, setScoreInputValue] = useState('');
   
   // Resources State
   const [resources, setResources] = useState<Resource[]>([]);
@@ -386,13 +391,57 @@ export const SubjectWorkspace: React.FC<Props> = ({
 
   // Task Handlers
   const handleToggleTask = async (task: Todo) => {
-    const updated = { ...task, completed: !task.completed };
+    const isNowCompleted = !task.completed;
+    const updated = { ...task, completed: isNowCompleted };
     setTasks(prev => prev.map(t => t.id === task.id ? updated : t));
+    showToast(isNowCompleted ? 'Tarea completada' : 'Tarea pendiente');
     try {
       await syncableUpdate('todos', updated);
     } catch (err) {
       console.error(err);
     }
+  };
+
+  const handleUpdateTaskGrade = async (task: Todo, score: number) => {
+    const existingGrade = grades.find(g => g.name === task.text && g.subject_id === subject.id);
+    const userId = await getUserId();
+    if (existingGrade) {
+      const updatedGrade: Grade = {
+        ...existingGrade,
+        score: score,
+        status: 'completed'
+      };
+      setGrades(prev => prev.map(g => g.id === existingGrade.id ? updatedGrade : g));
+      try {
+        await syncableUpdate('student_grades', updatedGrade);
+      } catch (err) {
+        console.error(err);
+      }
+    } else {
+      const newGrade: Grade = {
+        id: generateUUID(),
+        user_id: userId,
+        subject_id: subject.id,
+        unit_id: task.unit_id || undefined,
+        name: task.text,
+        score: score,
+        max_score: subject.grade_scale || 10,
+        weight: 0,
+        date: task.due_date || new Date().toISOString().split('T')[0],
+        status: 'completed',
+        created_at: new Date().toISOString()
+      };
+      setGrades(prev => [newGrade, ...prev]);
+      try {
+        await syncableCreate('student_grades', newGrade);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    setEditingScoreTaskId(null);
+    setScoreInputValue('');
+    showToast(`Nota de tarea guardada: ${score}`);
+    loadData();
   };
 
   const handleSaveTask = async () => {
@@ -431,9 +480,17 @@ export const SubjectWorkspace: React.FC<Props> = ({
   };
 
   const handleDeleteTask = async (taskId: number) => {
+    const taskToDelete = tasks.find(t => t.id === taskId);
     setTasks(prev => prev.filter(t => t.id !== taskId));
     try {
       await syncableDelete('todos', taskId);
+      if (taskToDelete) {
+        const gradeToDelete = grades.find(g => g.name === taskToDelete.text && g.subject_id === subject.id);
+        if (gradeToDelete) {
+          setGrades(prev => prev.filter(g => g.id !== gradeToDelete.id));
+          await syncableDelete('student_grades', gradeToDelete.id);
+        }
+      }
     } catch (err) {
       console.error(err);
     }
@@ -481,6 +538,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
   const handleSaveExam = async () => {
     if (!newExamTitle.trim() || !newExamDate) return;
     const userId = await getUserId();
+    const weightNum = newExamWeight ? parseFloat(newExamWeight) : undefined;
     const newExam: Exam = {
       id: generateUUID(),
       user_id: userId,
@@ -491,6 +549,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
       date: newExamDate,
       time: newExamTime || undefined,
       location: newExamLocation || undefined,
+      weight: weightNum,
       notes: newExamNotes || undefined,
       status: 'pending',
       created_at: new Date().toISOString()
@@ -504,11 +563,170 @@ export const SubjectWorkspace: React.FC<Props> = ({
     setNewExamLocation('');
     setNewExamUnitId('');
     setNewExamType('midterm');
+    setNewExamWeight('');
+    setNewExamCategoryId('');
     setNewExamNotes('');
-    showToast('Examen guardado');
+    showToast('Examen programado');
 
     try {
       await syncableCreate('student_exams', newExam);
+
+      // Create linked Todo in main todos table for complete integration
+      const examTodo: Todo = {
+        id: Date.now(),
+        user_id: userId,
+        text: `[Examen] ${newExam.title}`,
+        completed: false,
+        priority: 'high',
+        due_date: newExam.date,
+        start_time: newExam.time || undefined,
+        subject_id: subject.id,
+        unit_id: newExam.unit_id,
+        academic_type: 'exam',
+        notes: newExam.notes ? `Examen de ${subject.name}\n${newExam.notes}` : `Examen de ${subject.name}`,
+        created_at: new Date().toISOString()
+      };
+      await syncableCreate('todos', examTodo);
+
+      // If category or weight specified, create pending grade entry
+      if (newExamCategoryId || weightNum) {
+        const pendingGrade: Grade = {
+          id: generateUUID(),
+          user_id: userId,
+          subject_id: subject.id,
+          category_id: newExamCategoryId || undefined,
+          exam_id: newExam.id,
+          unit_id: newExam.unit_id,
+          name: newExam.title,
+          score: null,
+          max_score: subject.grade_scale || 10,
+          weight: weightNum || 0,
+          date: newExam.date,
+          status: 'pending',
+          created_at: new Date().toISOString()
+        };
+        setGrades(prev => [pendingGrade, ...prev]);
+        await syncableCreate('student_grades', pendingGrade);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+    loadData();
+  };
+
+  const handleToggleExam = async (exam: Exam, newScore?: number) => {
+    const isNowCompleted = exam.status !== 'completed';
+    const updatedExam: Exam = {
+      ...exam,
+      status: isNowCompleted ? 'completed' : 'pending',
+      grade: newScore !== undefined ? newScore : exam.grade
+    };
+
+    setExams(prev => prev.map(e => e.id === exam.id ? updatedExam : e));
+    showToast(isNowCompleted ? 'Examen completado' : 'Examen marcado como pendiente');
+
+    try {
+      await syncableUpdate('student_exams', updatedExam);
+
+      // Sync with linked todo in todos table
+      const allTodos = await getAll<Todo>('todos');
+      const linkedTodo = (allTodos || []).find(t => 
+        t.subject_id === subject.id && 
+        t.academic_type === 'exam' && 
+        (t.text.includes(exam.title) || exam.title.includes(t.text.replace('[Examen] ', '')))
+      );
+      if (linkedTodo) {
+        const updatedTodo = { ...linkedTodo, completed: isNowCompleted };
+        await syncableUpdate('todos', updatedTodo);
+      }
+
+      // Sync grade record
+      const existingGrade = grades.find(g => g.exam_id === exam.id || g.name === exam.title);
+      if (existingGrade) {
+        const updatedGrade: Grade = {
+          ...existingGrade,
+          score: updatedExam.grade ?? existingGrade.score,
+          status: isNowCompleted ? 'completed' : 'pending'
+        };
+        setGrades(prev => prev.map(g => g.id === existingGrade.id ? updatedGrade : g));
+        await syncableUpdate('student_grades', updatedGrade);
+      } else if (updatedExam.grade !== undefined && updatedExam.grade !== null) {
+        const newGrade: Grade = {
+          id: generateUUID(),
+          user_id: exam.user_id,
+          subject_id: subject.id,
+          exam_id: exam.id,
+          unit_id: exam.unit_id,
+          name: exam.title,
+          score: updatedExam.grade,
+          max_score: subject.grade_scale || 10,
+          weight: exam.weight || 0,
+          date: exam.date,
+          status: 'completed',
+          created_at: new Date().toISOString()
+        };
+        setGrades(prev => [newGrade, ...prev]);
+        await syncableCreate('student_grades', newGrade);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+    loadData();
+  };
+
+  const handleUpdateExamGrade = async (exam: Exam, score: number) => {
+    const updatedExam: Exam = {
+      ...exam,
+      grade: score,
+      status: 'completed'
+    };
+    setExams(prev => prev.map(e => e.id === exam.id ? updatedExam : e));
+    setEditingScoreExamId(null);
+    setScoreInputValue('');
+    showToast(`Nota guardada: ${score}`);
+
+    try {
+      await syncableUpdate('student_exams', updatedExam);
+
+      // Sync with linked todo in todos table
+      const allTodos = await getAll<Todo>('todos');
+      const linkedTodo = (allTodos || []).find(t => 
+        t.subject_id === subject.id && 
+        t.academic_type === 'exam' && 
+        (t.text.includes(exam.title) || exam.title.includes(t.text.replace('[Examen] ', '')))
+      );
+      if (linkedTodo) {
+        const updatedTodo = { ...linkedTodo, completed: true };
+        await syncableUpdate('todos', updatedTodo);
+      }
+
+      const existingGrade = grades.find(g => g.exam_id === exam.id || g.name === exam.title);
+      if (existingGrade) {
+        const updatedGrade: Grade = {
+          ...existingGrade,
+          score: score,
+          status: 'completed'
+        };
+        setGrades(prev => prev.map(g => g.id === existingGrade.id ? updatedGrade : g));
+        await syncableUpdate('student_grades', updatedGrade);
+      } else {
+        const newGrade: Grade = {
+          id: generateUUID(),
+          user_id: exam.user_id,
+          subject_id: subject.id,
+          exam_id: exam.id,
+          unit_id: exam.unit_id,
+          name: exam.title,
+          score: score,
+          max_score: subject.grade_scale || 10,
+          weight: exam.weight || 0,
+          date: exam.date,
+          status: 'completed',
+          created_at: new Date().toISOString()
+        };
+        setGrades(prev => [newGrade, ...prev]);
+        await syncableCreate('student_grades', newGrade);
+      }
     } catch (err) {
       console.error(err);
     }
@@ -516,12 +734,32 @@ export const SubjectWorkspace: React.FC<Props> = ({
   };
 
   const handleDeleteExam = async (examId: string) => {
+    const examToDelete = exams.find(e => e.id === examId);
     setExams(prev => prev.filter(e => e.id !== examId));
     try {
       await syncableDelete('student_exams', examId);
+
+      const linkedGrade = grades.find(g => g.exam_id === examId);
+      if (linkedGrade) {
+        setGrades(prev => prev.filter(g => g.id !== linkedGrade.id));
+        await syncableDelete('student_grades', linkedGrade.id);
+      }
+
+      if (examToDelete) {
+        const allTodos = await getAll<Todo>('todos');
+        const linkedTodo = (allTodos || []).find(t => 
+          t.subject_id === subject.id && 
+          t.academic_type === 'exam' && 
+          (t.text.includes(examToDelete.title) || examToDelete.title.includes(t.text.replace('[Examen] ', '')))
+        );
+        if (linkedTodo) {
+          await syncableDelete('todos', linkedTodo.id);
+        }
+      }
     } catch (err) {
       console.error(err);
     }
+    loadData();
   };
 
   const handleSaveResource = async () => {
@@ -1332,23 +1570,24 @@ export const SubjectWorkspace: React.FC<Props> = ({
                         ) : (
                           tasks.filter(t => !t.completed).map(task => {
                             const taskUnit = units.find(u => u.id === task.unit_id);
+                            const taskGrade = grades.find(g => g.name === task.text && g.subject_id === subject.id);
                             return (
                               <div
                                 key={task.id}
-                                className="bg-white dark:bg-[#151515] p-3.5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-2xs flex items-center justify-between group"
+                                className="bg-white dark:bg-[#151515] p-3.5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-2xs flex items-center justify-between gap-3 group"
                               >
-                                <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-3 min-w-0">
                                   <button
                                     onClick={() => handleToggleTask(task)}
-                                    className="w-5 h-5 rounded-md border-2 border-gray-300 dark:border-gray-600 flex items-center justify-center hover:border-gray-900 dark:hover:border-white transition-colors cursor-pointer"
+                                    className="w-5 h-5 rounded-md border-2 border-gray-300 dark:border-gray-600 flex items-center justify-center hover:border-gray-900 dark:hover:border-white transition-colors cursor-pointer shrink-0"
                                   >
                                     {task.completed && <CheckCircle2 className="w-4 h-4 text-gray-900 dark:text-white" />}
                                   </button>
-                                  <div>
-                                    <span className="text-sm font-semibold text-gray-900 dark:text-white block">
+                                  <div className="min-w-0">
+                                    <span className="text-sm font-semibold text-gray-900 dark:text-white block truncate">
                                       {task.text}
                                     </span>
-                                    <div className="flex items-center gap-2 mt-0.5">
+                                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                                       {taskUnit && (
                                         <span className="text-[10px] font-bold px-2 py-0.5 bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white rounded-md border border-gray-200 dark:border-white/10">
                                           {taskUnit.name}
@@ -1369,12 +1608,52 @@ export const SubjectWorkspace: React.FC<Props> = ({
                                   </div>
                                 </div>
 
-                                <button
-                                  onClick={() => handleDeleteTask(task.id)}
-                                  className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-red-500 transition-opacity cursor-pointer"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  {editingScoreTaskId === task.id ? (
+                                    <form
+                                      onSubmit={(e) => {
+                                        e.preventDefault();
+                                        const score = parseFloat(scoreInputValue);
+                                        if (!isNaN(score)) handleUpdateTaskGrade(task, score);
+                                      }}
+                                      className="flex items-center gap-1"
+                                    >
+                                      <input
+                                        type="number"
+                                        step="0.1"
+                                        autoFocus
+                                        value={scoreInputValue}
+                                        onChange={e => setScoreInputValue(e.target.value)}
+                                        placeholder="Nota"
+                                        className="w-16 px-2 py-0.5 text-xs bg-gray-50 dark:bg-[#111] border border-gray-300 dark:border-white/20 rounded-lg focus:outline-none"
+                                      />
+                                      <button type="submit" className="px-2 py-0.5 bg-black text-white dark:bg-white dark:text-black rounded text-[11px] font-bold">✓</button>
+                                      <button type="button" onClick={() => setEditingScoreTaskId(null)} className="px-1 text-gray-400 text-xs">✕</button>
+                                    </form>
+                                  ) : taskGrade && taskGrade.score !== null && taskGrade.score !== undefined ? (
+                                    <button
+                                      onClick={() => { setEditingScoreTaskId(task.id); setScoreInputValue(String(taskGrade.score)); }}
+                                      className="px-2 py-0.5 rounded-lg text-xs font-bold bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white border border-gray-200 dark:border-white/10 hover:opacity-80"
+                                      title="Editar calificación"
+                                    >
+                                      Nota: {taskGrade.score}/{taskGrade.max_score}
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={() => { setEditingScoreTaskId(task.id); setScoreInputValue(''); }}
+                                      className="text-[11px] font-semibold text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                                    >
+                                      + Nota
+                                    </button>
+                                  )}
+
+                                  <button
+                                    onClick={() => handleDeleteTask(task.id)}
+                                    className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-red-500 transition-opacity cursor-pointer"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
                               </div>
                             );
                           })
@@ -1388,25 +1667,68 @@ export const SubjectWorkspace: React.FC<Props> = ({
                         <h4 className="text-xs font-extrabold uppercase tracking-wider text-gray-400 mb-2">
                           Completadas ({tasks.filter(t => t.completed).length})
                         </h4>
-                        <div className="space-y-2 opacity-75">
-                          {tasks.filter(t => t.completed).map(task => (
-                            <div
-                              key={task.id}
-                              className="bg-white dark:bg-[#151515] p-3 rounded-2xl border border-gray-100 dark:border-white/5 flex items-center justify-between"
-                            >
-                              <div className="flex items-center gap-3">
-                                <button onClick={() => handleToggleTask(task)} className="cursor-pointer">
-                                  <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                                </button>
-                                <span className="text-sm font-medium text-gray-500 line-through">
-                                  {task.text}
-                                </span>
+                        <div className="space-y-2 opacity-85">
+                          {tasks.filter(t => t.completed).map(task => {
+                            const taskGrade = grades.find(g => g.name === task.text && g.subject_id === subject.id);
+                            return (
+                              <div
+                                key={task.id}
+                                className="bg-white dark:bg-[#151515] p-3 rounded-2xl border border-gray-100 dark:border-white/5 flex items-center justify-between gap-3 group"
+                              >
+                                <div className="flex items-center gap-3 min-w-0">
+                                  <button onClick={() => handleToggleTask(task)} className="w-5 h-5 rounded-md border-2 border-gray-900 dark:border-white bg-gray-900 dark:bg-white text-white dark:text-black flex items-center justify-center cursor-pointer shrink-0">
+                                    <Check className="w-3.5 h-3.5" />
+                                  </button>
+                                  <span className="text-sm font-medium text-gray-500 line-through truncate">
+                                    {task.text}
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center gap-2 shrink-0">
+                                  {editingScoreTaskId === task.id ? (
+                                    <form
+                                      onSubmit={(e) => {
+                                        e.preventDefault();
+                                        const score = parseFloat(scoreInputValue);
+                                        if (!isNaN(score)) handleUpdateTaskGrade(task, score);
+                                      }}
+                                      className="flex items-center gap-1"
+                                    >
+                                      <input
+                                        type="number"
+                                        step="0.1"
+                                        autoFocus
+                                        value={scoreInputValue}
+                                        onChange={e => setScoreInputValue(e.target.value)}
+                                        placeholder="Nota"
+                                        className="w-16 px-2 py-0.5 text-xs bg-gray-50 dark:bg-[#111] border border-gray-300 dark:border-white/20 rounded-lg focus:outline-none"
+                                      />
+                                      <button type="submit" className="px-2 py-0.5 bg-black text-white dark:bg-white dark:text-black rounded text-[11px] font-bold">✓</button>
+                                      <button type="button" onClick={() => setEditingScoreTaskId(null)} className="px-1 text-gray-400 text-xs">✕</button>
+                                    </form>
+                                  ) : taskGrade && taskGrade.score !== null && taskGrade.score !== undefined ? (
+                                    <button
+                                      onClick={() => { setEditingScoreTaskId(task.id); setScoreInputValue(String(taskGrade.score)); }}
+                                      className="px-2 py-0.5 rounded-lg text-xs font-bold bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white border border-gray-200 dark:border-white/10 hover:opacity-80"
+                                      title="Editar calificación"
+                                    >
+                                      Nota: {taskGrade.score}/{taskGrade.max_score}
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={() => { setEditingScoreTaskId(task.id); setScoreInputValue(''); }}
+                                      className="text-[11px] font-semibold text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                                    >
+                                      + Nota
+                                    </button>
+                                  )}
+                                  <button onClick={() => handleDeleteTask(task.id)} className="text-gray-400 hover:text-red-500 cursor-pointer">
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
                               </div>
-                              <button onClick={() => handleDeleteTask(task.id)} className="text-gray-400 hover:text-red-500 cursor-pointer">
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     )}
@@ -1528,61 +1850,110 @@ export const SubjectWorkspace: React.FC<Props> = ({
                     className="mt-4 px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-xl text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
                   >
                     <Plus className="w-4 h-4" />
-                    <span>Nuevo examen</span>
+                    <span>Programar examen</span>
                   </button>
                 </div>
               ) : (
                 <div className="space-y-3">
                   {exams.map(exam => {
                     const examUnit = units.find(u => u.id === exam.unit_id);
+                    const isCompleted = exam.status === 'completed';
                     return (
-                      <div key={exam.id} className="bg-white dark:bg-[#151515] p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 group">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-semibold text-lg text-gray-900 dark:text-gray-100">{exam.title}</h4>
-                            {examUnit && (
-                              <span className="text-[10px] font-bold px-2 py-0.5 bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white border border-gray-200 dark:border-white/10 rounded-md">
-                                {examUnit.name}
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
-                            <span className="capitalize">{exam.type}</span>
-                            <span>•</span>
-                            <span className="flex items-center gap-1">
-                              <Calendar className="w-3.5 h-3.5" />
-                              {exam.date} {exam.time && `a las ${exam.time}`}
-                            </span>
-                            {exam.location && (
-                              <>
-                                <span>•</span>
-                                <span>{exam.location}</span>
-                              </>
-                            )}
-                          </div>
-                          {exam.notes && (
-                            <p className="text-xs text-gray-400 mt-1 line-clamp-1">{exam.notes}</p>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-3">
+                      <div key={exam.id} className="bg-white dark:bg-[#151515] p-4 sm:p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 group">
+                        <div className="flex items-start gap-3.5 min-w-0">
+                          {/* Chequesito para completar o desmarcar */}
                           <button
-                            onClick={async () => {
-                              const newStatus = exam.status === 'completed' ? 'pending' : 'completed';
-                              const updated = { ...exam, status: newStatus as any };
-                              setExams(prev => prev.map(e => e.id === exam.id ? updated : e));
-                              try {
-                                await syncableUpdate('student_exams', updated);
-                              } catch (err) {
-                                console.error(err);
-                              }
-                            }}
-                            className={`px-3 py-1 rounded-full text-xs font-bold cursor-pointer border border-gray-200 dark:border-white/10 ${exam.status === 'completed' ? 'bg-gray-100 text-gray-900 dark:bg-white/20 dark:text-white' : 'bg-gray-50 text-gray-600 dark:bg-white/5 dark:text-gray-300'}`}
+                            type="button"
+                            onClick={() => handleToggleExam(exam)}
+                            className={`w-5 h-5 rounded-md border-2 mt-0.5 flex items-center justify-center transition-colors cursor-pointer shrink-0 ${
+                              isCompleted
+                                ? 'bg-gray-900 dark:bg-white border-gray-900 dark:border-white text-white dark:text-black'
+                                : 'border-gray-300 dark:border-gray-600 hover:border-gray-900 dark:hover:border-white'
+                            }`}
+                            title={isCompleted ? 'Desmarcar examen' : 'Marcar examen como completado'}
                           >
-                            {exam.status === 'completed' ? '✓ Completado' : '⏳ Pendiente'}
+                            {isCompleted && <Check className="w-3.5 h-3.5" />}
                           </button>
+
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className={`font-bold text-base text-gray-900 dark:text-gray-100 ${isCompleted ? 'line-through text-gray-500' : ''}`}>
+                                {exam.title}
+                              </h4>
+                              {examUnit && (
+                                <span className="text-[10px] font-bold px-2 py-0.5 bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white border border-gray-200 dark:border-white/10 rounded-md">
+                                  {examUnit.name}
+                                </span>
+                              )}
+                              {exam.weight !== undefined && exam.weight !== null && exam.weight > 0 && (
+                                <span className="text-[10px] font-bold px-2 py-0.5 bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-gray-300 rounded-md border border-gray-200 dark:border-white/10">
+                                  {exam.weight}%
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2.5 mt-1 text-xs text-gray-500 flex-wrap">
+                              <span className="capitalize font-medium">{exam.type}</span>
+                              <span>•</span>
+                              <span className="flex items-center gap-1 font-mono">
+                                <Calendar className="w-3.5 h-3.5" />
+                                {exam.date} {exam.time && `(${exam.time})`}
+                              </span>
+                              {exam.location && (
+                                <>
+                                  <span>•</span>
+                                  <span>{exam.location}</span>
+                                </>
+                              )}
+                            </div>
+                            {exam.notes && (
+                              <p className="text-xs text-gray-400 mt-1 line-clamp-1">{exam.notes}</p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Calificación y Acciones */}
+                        <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-center">
+                          {editingScoreExamId === exam.id ? (
+                            <form
+                              onSubmit={(e) => {
+                                e.preventDefault();
+                                const score = parseFloat(scoreInputValue);
+                                if (!isNaN(score)) handleUpdateExamGrade(exam, score);
+                              }}
+                              className="flex items-center gap-1"
+                            >
+                              <input
+                                type="number"
+                                step="0.1"
+                                autoFocus
+                                value={scoreInputValue}
+                                onChange={e => setScoreInputValue(e.target.value)}
+                                placeholder="Nota"
+                                className="w-16 px-2 py-1 text-xs bg-gray-50 dark:bg-[#111] border border-gray-300 dark:border-white/20 rounded-lg focus:outline-none"
+                              />
+                              <button type="submit" className="px-2.5 py-1 bg-black text-white dark:bg-white dark:text-black rounded-lg text-xs font-bold">✓</button>
+                              <button type="button" onClick={() => setEditingScoreExamId(null)} className="px-1.5 text-gray-400 text-xs">✕</button>
+                            </form>
+                          ) : exam.grade !== undefined && exam.grade !== null ? (
+                            <button
+                              onClick={() => { setEditingScoreExamId(exam.id); setScoreInputValue(String(exam.grade)); }}
+                              className="px-3 py-1 rounded-xl text-xs font-bold bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white border border-gray-200 dark:border-white/10 hover:opacity-80"
+                              title="Editar nota del examen"
+                            >
+                              Nota: {exam.grade}/{subject.grade_scale || 10}
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => { setEditingScoreExamId(exam.id); setScoreInputValue(''); }}
+                              className="px-2.5 py-1 rounded-xl text-xs font-semibold bg-gray-50 dark:bg-white/5 border border-dashed border-gray-300 dark:border-white/20 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+                            >
+                              + Nota
+                            </button>
+                          )}
+
                           <button
                             onClick={() => handleDeleteExam(exam.id)}
-                            className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all cursor-pointer"
+                            className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-red-500 transition-all cursor-pointer"
                             title="Eliminar examen"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -1657,87 +2028,82 @@ export const SubjectWorkspace: React.FC<Props> = ({
             const usedWeight = categories.reduce((sum, c) => sum + (c.weight || 0), 0);
 
             return (
-              <div className="space-y-6">
-                {/* Grade Summary & Target Projection Banner */}
-                <div className="bg-white dark:bg-[#151515] p-5 sm:p-6 rounded-3xl border border-gray-100 dark:border-white/5 shadow-sm space-y-4">
+              <div className="space-y-4">
+                {/* Resumen Minimalista */}
+                <div className="bg-white dark:bg-[#151515] p-5 rounded-3xl border border-gray-150/70 dark:border-white/5 shadow-2xs space-y-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-100 dark:border-white/5">
                     <div>
                       <span className="text-[10px] font-extrabold uppercase tracking-wider text-gray-400 block mb-1">
-                        Promedio Actual del Curso
+                        Promedio del Curso
                       </span>
                       <div className="flex items-baseline gap-2">
                         <span className="text-3xl font-extrabold text-gray-900 dark:text-white">
-                          {summary.currentAverage !== null ? summary.currentAverage : 'S/N'}
+                          {summary.currentAverage !== null ? summary.currentAverage.toFixed(1) : 'S/N'}
                         </span>
-                        <span className="text-sm text-gray-400 font-medium">/ {summary.gradeScale}</span>
+                        <span className="text-xs text-gray-400 font-medium">/ {summary.gradeScale}</span>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <div className="px-3 py-1.5 rounded-2xl bg-blue-50 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300 text-xs font-bold">
+                      <div className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white text-xs font-bold border border-gray-200 dark:border-white/10">
                         {summary.evaluatedPercentage}% Evaluado
                       </div>
                       <button
                         onClick={() => setIsAddingCategory(true)}
-                        className="px-3.5 py-1.5 bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/15 text-gray-800 dark:text-white rounded-2xl text-xs font-semibold transition-colors"
+                        className="px-3.5 py-1.5 bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/15 text-gray-800 dark:text-white rounded-xl text-xs font-bold transition-colors cursor-pointer border border-gray-200 dark:border-white/10"
                       >
                         + Categoría
                       </button>
                       <button
                         onClick={() => setIsAddingGrade(true)}
-                        className="px-3.5 py-1.5 bg-black dark:bg-white text-white dark:text-black rounded-2xl text-xs font-bold transition-opacity hover:opacity-90 shadow-2xs"
+                        className="px-3.5 py-1.5 bg-black dark:bg-white text-white dark:text-black rounded-xl text-xs font-bold transition-opacity hover:opacity-90 shadow-2xs cursor-pointer"
                       >
                         + Evaluación
                       </button>
                     </div>
                   </div>
 
-                  {/* Projection Feedback */}
                   {summary.targetProjection && (
-                    <div className="p-3.5 rounded-2xl text-xs font-medium flex items-start gap-2.5 bg-gray-50 dark:bg-white/5 text-gray-900 dark:text-white border border-gray-200 dark:border-white/10">
-                      <Target className="w-4 h-4 shrink-0 mt-0.5 text-gray-900 dark:text-white" />
-                      <div>
-                        <span className="font-bold uppercase tracking-wider block text-[10px] mb-0.5">Proyección para tu Meta:</span>
-                        <p className="leading-relaxed">{summary.targetProjection.message}</p>
-                      </div>
+                    <div className="p-3 rounded-2xl text-xs font-medium flex items-center gap-2 bg-gray-50 dark:bg-white/5 text-gray-700 dark:text-gray-300 border border-gray-150/60 dark:border-white/5">
+                      <Target className="w-3.5 h-3.5 shrink-0 text-gray-900 dark:text-white" />
+                      <p className="leading-snug">{summary.targetProjection.message}</p>
                     </div>
                   )}
                 </div>
 
-                {/* Categorías de Evaluación */}
-                <div className="bg-white dark:bg-[#151515] p-5 sm:p-6 rounded-3xl border border-gray-100 dark:border-white/5 shadow-2xs space-y-4">
+                {/* Categorías y Ponderaciones Minimalistas */}
+                <div className="bg-white dark:bg-[#151515] p-5 rounded-3xl border border-gray-150/70 dark:border-white/5 shadow-2xs space-y-3">
                   <div className="flex justify-between items-center">
                     <div>
-                      <h4 className="text-sm font-bold text-gray-900 dark:text-white">Categorías y Ponderaciones</h4>
-                      <p className="text-xs text-gray-400 mt-0.5">Ponderación asignada: {usedWeight}% / 100%</p>
+                      <h4 className="text-xs font-extrabold uppercase tracking-wider text-gray-400">Ponderaciones ({usedWeight}% / 100%)</h4>
                     </div>
                     <button
                       onClick={() => setIsAddingCategory(true)}
-                      className="text-xs font-bold text-gray-900 dark:text-white hover:underline"
+                      className="text-xs font-bold text-gray-900 dark:text-white hover:underline cursor-pointer"
                     >
-                      + Nueva
+                      + Nueva categoría
                     </button>
                   </div>
 
                   {categories.length === 0 ? (
-                    <p className="text-xs text-gray-400 py-3 text-center">No has creado categorías todavía (ej. Parciales 40%, Tareas 30%, Examen Final 30%).</p>
+                    <p className="text-xs text-gray-400 py-2 text-center">Sin categorías configuradas (ej. Parciales 40%, Tareas 30%, Final 30%).</p>
                   ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
                       {categories.map(cat => {
                         const catSummary = summary.categorySummaries.find(cs => cs.category.id === cat.id);
                         return (
-                          <div key={cat.id} className="p-3.5 rounded-2xl bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/5 flex items-center justify-between">
+                          <div key={cat.id} className="p-3 rounded-2xl bg-gray-50 dark:bg-[#16141f] border border-gray-150/70 dark:border-white/5 flex items-center justify-between">
                             <div>
                               <span className="font-bold text-xs text-gray-900 dark:text-white block">{cat.name}</span>
-                              <span className="text-[10px] text-gray-400 font-medium">Peso: {cat.weight}%</span>
+                              <span className="text-[10px] text-gray-400">Peso: {cat.weight}%</span>
                             </div>
-                            <div className="flex items-center gap-3">
-                              <span className="text-sm font-extrabold text-gray-900 dark:text-white">
+                            <div className="flex items-center gap-2.5">
+                              <span className="text-xs font-extrabold text-gray-900 dark:text-white">
                                 {catSummary?.average !== null && catSummary?.average !== undefined ? catSummary.average.toFixed(1) : 'S/N'}
                               </span>
                               <button
                                 onClick={() => handleDeleteCategory(cat.id)}
-                                className="text-gray-400 hover:text-gray-900 dark:hover:text-white p-1"
+                                className="text-gray-400 hover:text-red-500 p-1 cursor-pointer"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
@@ -1749,45 +2115,45 @@ export const SubjectWorkspace: React.FC<Props> = ({
                   )}
                 </div>
 
-                {/* Registro de Evaluaciones */}
-                <div className="bg-white dark:bg-[#151515] p-5 sm:p-6 rounded-3xl border border-gray-100 dark:border-white/5 shadow-2xs space-y-4">
+                {/* Registro de Evaluaciones Minimalista */}
+                <div className="bg-white dark:bg-[#151515] p-5 rounded-3xl border border-gray-150/70 dark:border-white/5 shadow-2xs space-y-3">
                   <div className="flex justify-between items-center">
-                    <h4 className="text-sm font-bold text-gray-900 dark:text-white">Evaluaciones Registradas</h4>
+                    <h4 className="text-xs font-extrabold uppercase tracking-wider text-gray-400">Historial de Calificaciones ({grades.length})</h4>
                     <button
                       onClick={() => setIsAddingGrade(true)}
-                      className="text-xs font-bold text-gray-900 dark:text-white hover:underline"
+                      className="text-xs font-bold text-gray-900 dark:text-white hover:underline cursor-pointer"
                     >
-                      + Añadir
+                      + Añadir nota
                     </button>
                   </div>
 
                   {grades.length === 0 ? (
-                    <p className="text-xs text-gray-400 py-6 text-center">No hay evaluaciones registradas en esta materia.</p>
+                    <p className="text-xs text-gray-400 py-4 text-center">No hay calificaciones registradas aún en esta materia.</p>
                   ) : (
-                    <div className="space-y-2.5">
+                    <div className="space-y-2">
                       {grades.map(grade => {
                         const cat = categories.find(c => c.id === grade.category_id);
                         const isPending = grade.score === null || grade.status === 'pending';
                         return (
-                          <div key={grade.id} className="p-3.5 rounded-2xl bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/5 flex items-center justify-between gap-3">
+                          <div key={grade.id} className="p-3.5 rounded-2xl bg-gray-50 dark:bg-[#16141f] border border-gray-150/70 dark:border-white/5 flex items-center justify-between gap-3 group">
                             <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
                                 <span className="font-bold text-xs text-gray-900 dark:text-white truncate">{grade.name}</span>
                                 {cat && (
-                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-900 dark:bg-white/10 dark:text-white border border-gray-200 dark:border-white/10 shrink-0">
+                                  <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-white dark:bg-white/10 text-gray-900 dark:text-white border border-gray-200 dark:border-white/10 shrink-0">
                                     {cat.name} ({cat.weight}%)
                                   </span>
                                 )}
                               </div>
-                              <div className="flex items-center gap-3 text-[10px] text-gray-400 mt-1">
+                              <div className="flex items-center gap-2 text-[10px] text-gray-400 mt-0.5">
                                 {grade.date && <span>📅 {grade.date}</span>}
-                                {grade.notes && <span className="truncate">💬 {grade.notes}</span>}
+                                {grade.notes && <span className="truncate">• {grade.notes}</span>}
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-3 shrink-0">
+                            <div className="flex items-center gap-2.5 shrink-0">
                               {isPending ? (
-                                <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-300 border border-gray-200 dark:border-white/10">
+                                <span className="px-2.5 py-1 rounded-xl text-xs font-semibold bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300 border border-gray-200 dark:border-white/10">
                                   ⏳ Pendiente
                                 </span>
                               ) : (
@@ -1799,7 +2165,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                               )}
                               <button
                                 onClick={() => handleDeleteGrade(grade.id)}
-                                className="text-gray-400 hover:text-gray-900 dark:hover:text-white p-1"
+                                className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 p-1 cursor-pointer transition-opacity"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
@@ -1811,20 +2177,20 @@ export const SubjectWorkspace: React.FC<Props> = ({
                   )}
                 </div>
 
-                {/* Attendance Record */}
-                <div className="bg-white dark:bg-[#151515] p-5 sm:p-6 rounded-3xl border border-gray-100 dark:border-white/5 shadow-2xs space-y-4">
+                {/* Asistencia de Hoy */}
+                <div className="bg-white dark:bg-[#151515] p-5 rounded-3xl border border-gray-150/70 dark:border-white/5 shadow-2xs space-y-3">
                   <div className="flex justify-between items-center">
-                    <h4 className="text-sm font-bold text-gray-900 dark:text-white">Asistencia de Hoy</h4>
-                    <span className="text-xs font-medium text-gray-400">{new Date().toLocaleDateString()}</span>
+                    <h4 className="text-xs font-extrabold uppercase tracking-wider text-gray-400">Asistencia de Hoy</h4>
+                    <span className="text-xs font-mono text-gray-400">{new Date().toLocaleDateString()}</span>
                   </div>
-                  <div className="flex gap-2.5">
-                    <button onClick={() => handleRecordAttendance('present')} className="flex-1 py-2.5 bg-gray-100 text-gray-900 dark:bg-white/15 dark:text-white rounded-2xl text-xs font-bold hover:bg-gray-200 dark:hover:bg-white/25 transition-colors border border-gray-200 dark:border-white/10">
+                  <div className="flex gap-2">
+                    <button onClick={() => handleRecordAttendance('present')} className="flex-1 py-2 bg-gray-100 text-gray-900 dark:bg-white/10 dark:text-white rounded-xl text-xs font-bold hover:opacity-90 transition-colors border border-gray-200 dark:border-white/10 cursor-pointer">
                       Presente
                     </button>
-                    <button onClick={() => handleRecordAttendance('absent')} className="flex-1 py-2.5 bg-gray-50 text-gray-600 dark:bg-white/5 dark:text-gray-400 rounded-2xl text-xs font-bold hover:bg-gray-100 dark:hover:bg-white/10 transition-colors border border-gray-200 dark:border-white/10">
+                    <button onClick={() => handleRecordAttendance('absent')} className="flex-1 py-2 bg-gray-50 text-gray-600 dark:bg-white/5 dark:text-gray-400 rounded-xl text-xs font-bold hover:opacity-90 transition-colors border border-gray-200 dark:border-white/10 cursor-pointer">
                       Ausente
                     </button>
-                    <button onClick={() => handleRecordAttendance('excused')} className="flex-1 py-2.5 bg-gray-100 text-gray-800 dark:bg-white/10 dark:text-gray-300 rounded-2xl text-xs font-bold hover:bg-gray-200 dark:hover:bg-white/20 transition-colors border border-gray-200 dark:border-white/10">
+                    <button onClick={() => handleRecordAttendance('excused')} className="flex-1 py-2 bg-gray-50 text-gray-600 dark:bg-white/5 dark:text-gray-400 rounded-xl text-xs font-bold hover:opacity-90 transition-colors border border-gray-200 dark:border-white/10 cursor-pointer">
                       Justificado
                     </button>
                   </div>
@@ -1877,28 +2243,137 @@ export const SubjectWorkspace: React.FC<Props> = ({
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 220 }}
-              className="bg-white dark:bg-[#18181b] rounded-t-3xl sm:rounded-2xl w-full max-w-md shadow-2xl overflow-hidden border-t sm:border border-gray-200 dark:border-white/10"
+              className="bg-white dark:bg-[#18181b] rounded-t-3xl sm:rounded-2xl w-full max-w-md shadow-2xl overflow-hidden border-t sm:border border-gray-200 dark:border-white/10 max-h-[90vh] flex flex-col"
             >
-              <div className="w-12 h-1 bg-gray-300 dark:bg-gray-700 rounded-full mx-auto my-2.5 sm:hidden" />
-              <div className="px-6 py-3.5 border-b border-gray-100 dark:border-white/5 flex items-center justify-between">
-                <h3 className="text-base font-bold text-gray-900 dark:text-white">Programar Examen</h3>
+              <div className="w-12 h-1 bg-gray-300 dark:bg-gray-700 rounded-full mx-auto my-2.5 sm:hidden shrink-0" />
+              <div className="px-6 py-3.5 border-b border-gray-100 dark:border-white/5 flex items-center justify-between shrink-0">
+                <div>
+                  <h3 className="text-base font-bold text-gray-900 dark:text-white">Programar Examen / Evaluación</h3>
+                  <p className="text-[11px] text-gray-400">Se sincronizará con tu calendario y módulo de tareas</p>
+                </div>
                 <button onClick={() => setIsAddingExam(false)} className="p-1 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              <div className="p-6 space-y-4">
+              <div className="p-6 space-y-3.5 overflow-y-auto">
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">Título</label>
-                  <input type="text" value={newExamTitle} onChange={e => setNewExamTitle(e.target.value)} className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white text-sm" placeholder="Ej: Parcial 1" autoFocus />
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">Título del examen *</label>
+                  <input
+                    type="text"
+                    value={newExamTitle}
+                    onChange={e => setNewExamTitle(e.target.value)}
+                    className="w-full px-3.5 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white text-sm"
+                    placeholder="Ej: Primer Examen Parcial"
+                    autoFocus
+                  />
                 </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">Tipo</label>
+                    <select
+                      value={newExamType}
+                      onChange={e => setNewExamType(e.target.value as any)}
+                      className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white text-xs"
+                    >
+                      <option value="midterm">Parcial</option>
+                      <option value="quiz">Quiz / Corto</option>
+                      <option value="final">Examen Final</option>
+                      <option value="lab">Laboratorio / Práctica</option>
+                      <option value="presentation">Presentación / Defensa</option>
+                      <option value="other">Otro</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">Ponderación (%)</label>
+                    <input
+                      type="number"
+                      value={newExamWeight}
+                      onChange={e => setNewExamWeight(e.target.value)}
+                      className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white text-xs"
+                      placeholder="Ej: 25"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">Fecha *</label>
+                    <input
+                      type="date"
+                      value={newExamDate}
+                      onChange={e => setNewExamDate(e.target.value)}
+                      className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white text-xs font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">Hora</label>
+                    <input
+                      type="time"
+                      value={newExamTime}
+                      onChange={e => setNewExamTime(e.target.value)}
+                      className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white text-xs font-mono"
+                    />
+                  </div>
+                </div>
+
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">Fecha</label>
-                  <input type="date" value={newExamDate} onChange={e => setNewExamDate(e.target.value)} className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white text-xs" />
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">Ubicación / Aula (Opcional)</label>
+                  <input
+                    type="text"
+                    value={newExamLocation}
+                    onChange={e => setNewExamLocation(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white text-xs"
+                    placeholder="Ej: Aula Magna 201 o Zoom"
+                  />
+                </div>
+
+                {categories.length > 0 && (
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">Categoría de Calificación</label>
+                    <select
+                      value={newExamCategoryId}
+                      onChange={e => setNewExamCategoryId(e.target.value)}
+                      className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white text-xs"
+                    >
+                      <option value="">Sin categoría asignada</option>
+                      {categories.map(c => (
+                        <option key={c.id} value={c.id}>{c.name} ({c.weight}%)</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {units.length > 0 && (
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">Unidad del Temario</label>
+                    <select
+                      value={newExamUnitId}
+                      onChange={e => setNewExamUnitId(e.target.value)}
+                      className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white text-xs"
+                    >
+                      <option value="">Sin unidad específica</option>
+                      {units.map(u => (
+                        <option key={u.id} value={u.id}>{u.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">Temas / Instrucciones a Estudiar</label>
+                  <textarea
+                    value={newExamNotes}
+                    onChange={e => setNewExamNotes(e.target.value)}
+                    rows={2}
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white"
+                    placeholder="Capítulos 1 al 4, fórmulas de derivadas..."
+                  />
                 </div>
               </div>
-              <div className="px-6 py-4 border-t border-gray-100 dark:border-white/5 flex justify-end gap-3 bg-gray-50 dark:bg-[#111]/50">
-                <button onClick={() => setIsAddingExam(false)} className="px-4 py-2 text-xs font-semibold hover:bg-gray-200 dark:hover:bg-white/5 rounded-xl transition-colors">Cancelar</button>
-                <button onClick={handleSaveExam} disabled={!newExamTitle.trim() || !newExamDate} className="px-4 py-2 text-xs font-bold bg-gray-900 text-white dark:bg-white dark:text-black rounded-xl hover:bg-black dark:hover:bg-gray-100 disabled:opacity-50 transition-colors">Guardar</button>
+              <div className="px-6 py-4 border-t border-gray-100 dark:border-white/5 flex justify-end gap-3 bg-gray-50 dark:bg-[#111]/50 shrink-0">
+                <button onClick={() => setIsAddingExam(false)} className="px-4 py-2 text-xs font-semibold hover:bg-gray-200 dark:hover:bg-white/5 rounded-xl transition-colors cursor-pointer">Cancelar</button>
+                <button onClick={handleSaveExam} disabled={!newExamTitle.trim() || !newExamDate} className="px-4 py-2 text-xs font-bold bg-gray-900 text-white dark:bg-white dark:text-black rounded-xl hover:bg-black dark:hover:bg-gray-100 disabled:opacity-50 transition-colors cursor-pointer">Guardar Examen</button>
               </div>
             </motion.div>
           </div>

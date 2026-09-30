@@ -4347,6 +4347,25 @@ const App: React.FC = () => {
     
     setAllTodos(nextState);
     await syncableUpdate('todos', updatedTodo);
+
+    if (updatedTodo.academic_type === 'exam' && updatedTodo.subject_id) {
+      try {
+        const allExams = await getAll<any>('student_exams');
+        const examMatch = (allExams || []).find((e: any) => 
+          e.subject_id === updatedTodo.subject_id && 
+          (updatedTodo.text.includes(e.title) || e.title.includes(updatedTodo.text.replace('[Examen] ', '')))
+        );
+        if (examMatch) {
+          const updatedExam = {
+            ...examMatch,
+            status: newCompletedState ? 'completed' : 'pending'
+          };
+          await syncableUpdate('student_exams', updatedExam);
+        }
+      } catch (err) {
+        console.warn("Failed syncing exam status:", err);
+      }
+    }
     
     const dateKeyForCompletionCheck = updatedTodo.due_date || originalDateKey;
     if (newCompletedState && dateKeyForCompletionCheck !== 'undated' && nextState[dateKeyForCompletionCheck]?.every(t => t.completed)) {
